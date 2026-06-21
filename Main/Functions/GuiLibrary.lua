@@ -1,14 +1,3 @@
---[[
-Bloxstrap: Executor Edition
-
-GuiLibrary.lua -> The GUI Library thatbyou will see upon starting the script
-
-THIS WAS NOT MADE BY US!
-This is RedZHub GUI Library.
-Edited for usage in Bloxstrap, we do not own ANY of this code, we are using it for usage of Bloxstrap!
-]]--
-
-
 local MarketplaceService = game:GetService("MarketplaceService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -19,7 +8,7 @@ local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerMouse = Player:GetMouse()
 
-local redzlib = {
+local cleolib = {
 	Themes = {
 		Darker = {
 			["Color Hub 1"] = ColorSequence.new({
@@ -79,12 +68,12 @@ local redzlib = {
 local ViewportSize = workspace.CurrentCamera.ViewportSize
 local UIScale = ViewportSize.Y / 450
 
-local Settings = redzlib.Settings
-local Flags = redzlib.Flags
+local Settings = cleolib.Settings
+local Flags = cleolib.Flags
 
 local SetProps, SetChildren, InsertTheme, Create do
 	InsertTheme = function(Instance, Type)
-		table.insert(redzlib.Instances, {
+		table.insert(cleolib.Instances, {
 			Instance = Instance,
 			Type = Type
 		})
@@ -133,14 +122,14 @@ local SetProps, SetChildren, InsertTheme, Create do
 			local decode = HttpService:JSONDecode(readfile(file))
 			
 			if type(decode) == "table" then
-				if rawget(decode, "UISize") then redzlib.Save["UISize"] = decode["UISize"] end
-				if rawget(decode, "TabSize") then redzlib.Save["TabSize"] = decode["TabSize"] end
-				if rawget(decode, "Theme") and VerifyTheme(decode["Theme"]) then redzlib.Save["Theme"] = decode["Theme"] end
+				if rawget(decode, "UISize") then cleolib.Save["UISize"] = decode["UISize"] end
+				if rawget(decode, "TabSize") then cleolib.Save["TabSize"] = decode["TabSize"] end
+				if rawget(decode, "Theme") and VerifyTheme(decode["Theme"]) then cleolib.Save["Theme"] = decode["Theme"] end
 			end
 		end
 	end
 	
-	pcall(Save, "redz library V5.json")
+	pcall(Save, "Cleostrap/Main/Configs/Library.json")
 end
 
 local Funcs = {} do
@@ -155,8 +144,8 @@ local Funcs = {} do
 		for _,v in ipairs(tab) do
 			if type(v) == "function" then
 				task.spawn(v, ...)
-				if Bloxstrap ~= nil then
-					Bloxstrap.SaveConfig()
+				if Cleostrap ~= nil then
+					Cleostrap.SaveConfig()
 				end
 			end
 		end
@@ -166,11 +155,11 @@ local Funcs = {} do
 		Obj.Visible = Bool ~= nil and Bool or Obj.Visible
 	end
 	
-	function Funcs:ToggleParent(Obj, Parent)
+	function Funcs:ToggleParent(Obj, Bool, Parent)
 		if Bool ~= nil then
-			Obj.Parent = Bool
+			Obj.Parent = Bool and Parent or nil
 		else
-			Obj.Parent = not Obj.Parent and Parent
+			Obj.Parent = not Obj.Parent and Parent or nil
 		end
 	end
 	
@@ -203,7 +192,7 @@ local Funcs = {} do
 	end
 end
 
-local Connections, Connection = {}, redzlib.Connection do
+local Connections, Connection = {}, cleolib.Connection do
 	local function NewConnectionList(List)
 		if type(List) ~= "table" then return end
 		
@@ -269,8 +258,6 @@ local GetFlag, SetFlag, CheckFlag do
 			db=true;task.wait(0.1);db=false
 			
 			local Success, Encoded = pcall(function()
-				-- local _Flags = {}
-				-- for _,Flag in pairs(Flags) do _Flags[_] = Flag.Value end
 				return HttpService:JSONEncode(Flags)
 			end)
 			
@@ -285,7 +272,7 @@ local GetFlag, SetFlag, CheckFlag do
 end
 
 local ScreenGui = Create("ScreenGui", CoreGui, {
-	Name = "redz Library V5",
+	Name = "Cleostrap Library",
 }, {
 	Create("UIScale", {
 		Scale = UIScale,
@@ -332,46 +319,13 @@ local function CreateTween(Configs)
 end
 
 local function MakeDrag(Instance)
-	--[[task.spawn(function()
-		SetProps(Instance, {
-			Active = true,
-			AutoButtonColor = false
-		})
-		
-		local DragStart, StartPos, InputOn
-		
-		local function Update(Input)
-			local delta = Input.Position - DragStart
-			local Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + delta.X / UIScale, StartPos.Y.Scale, StartPos.Y.Offset + delta.Y / UIScale)
-			-- Instance.Position = Position
-			CreateTween({Instance, "Position", Position, 0.35})
-		end
-		
-		Instance.MouseButton1Down:Connect(function()
-			InputOn = true
-		end)
-		
-		Instance.InputBegan:Connect(function(Input)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-				StartPos = Instance.Position
-				DragStart = Input.Position
-				
-				while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do RunService.Heartbeat:Wait()
-					if InputOn then
-						Update(Input)
-					end
-				end
-				InputOn = false
-			end
-		end)
-	end)]]
-        Instance.Active = true
+	Instance.Active = true
 	Instance.Draggable = true
 	return Instance
 end
 
 local function VerifyTheme(Theme)
-	for name,_ in pairs(redzlib.Themes) do
+	for name,_ in pairs(cleolib.Themes) do
 		if name == Theme then
 			return true
 		end
@@ -385,14 +339,14 @@ local function SaveJson(FileName, save)
 	end
 end
 
-local Theme = redzlib.Themes[redzlib.Save.Theme]
+local Theme = cleolib.Themes[cleolib.Save.Theme]
 
 local function AddEle(Name, Func)
-	redzlib.Elements[Name] = Func
+	cleolib.Elements[Name] = Func
 end
 
 local function Make(Ele, Instance, props, ...)
-	local Element = redzlib.Elements[Ele](Instance, props, ...)
+	local Element = cleolib.Elements[Ele](Instance, props, ...)
 	return Element
 end
 
@@ -538,20 +492,19 @@ local function GetColor(Instance)
 	return ""
 end
 
--- /////////// --
-function redzlib:GetIcon(index)
+function cleolib:GetIcon(index)
 	return ''
 end
 
-function redzlib:SetTheme(NewTheme)
+function cleolib:SetTheme(NewTheme)
 	if not VerifyTheme(NewTheme) then return end
 	
-	redzlib.Save.Theme = NewTheme
-	SaveJson("redz library V5.json", redzlib.Save)
-	Theme = redzlib.Themes[NewTheme]
+	cleolib.Save.Theme = NewTheme
+	SaveJson("Cleostrap/Main/Configs/Library.json", cleolib.Save)
+	Theme = cleolib.Themes[NewTheme]
 	
-	Comnection:FireConnection("ThemeChanged", NewTheme)
-	table.foreach(redzlib.Instances, function(_,Val)
+	Connection:FireConnection("ThemeChanged", NewTheme)
+	table.foreach(cleolib.Instances, function(_,Val)
 		if Val.Type == "Gradient" then
 			Val.Instance.Color = Theme["Color Hub 1"]
 		elseif Val.Type == "Frame" then
@@ -570,14 +523,14 @@ function redzlib:SetTheme(NewTheme)
 	end)
 end
 
-function redzlib:SetScale(NewScale)
+function cleolib:SetScale(NewScale)
 	NewScale = ViewportSize.Y / math.clamp(NewScale, 300, 2000)
 	UIScale, ScreenGui.Scale.Scale = NewScale, NewScale
 end
 
-function redzlib:MakeWindow(Configs)
-	local WTitle = Configs[1] or Configs.Name or Configs.Title or "redz Library V5"
-	local WMiniText = Configs[2] or Configs.SubTitle or "by : redz9999"
+function cleolib:MakeWindow(Configs)
+	local WTitle = Configs[1] or Configs.Name or Configs.Title or "Cleostrap Library"
+	local WMiniText = Configs[2] or Configs.SubTitle or "by : StyearX"
 	
 	Settings.ScriptFile = Configs[3] or Configs.SaveFolder or false
 	
@@ -597,7 +550,7 @@ function redzlib:MakeWindow(Configs)
 		end
 	end;LoadFile()
 	
-	local UISizeX, UISizeY = unpack(redzlib.Save.UISize)
+	local UISizeX, UISizeY = unpack(cleolib.Save.UISize)
 	local MainFrame = InsertTheme(Create("ImageButton", ScreenGui, {
 		Size = UDim2.fromOffset(UISizeX, UISizeY),
 		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
@@ -653,7 +606,7 @@ function redzlib:MakeWindow(Configs)
 	}), "Text")
 	
 	local MainScroll = InsertTheme(Create("ScrollingFrame", Components, {
-		Size = UDim2.new(0, redzlib.Save.TabSize, 1, -TopBar.Size.Y.Offset),
+		Size = UDim2.new(0, cleolib.Save.TabSize, 1, -TopBar.Size.Y.Offset),
 		ScrollBarImageColor3 = Theme["Color Theme"],
 		Position = UDim2.new(0, 0, 1, 0),
 		AnchorPoint = Vector2.new(0, 1),
@@ -716,14 +669,14 @@ function redzlib:MakeWindow(Configs)
 	
 	ConnectSave(ControlSize1, function()
 		if not Minimized then
-			redzlib.Save.UISize = {MainFrame.Size.X.Offset, MainFrame.Size.Y.Offset}
-			SaveJson("redz library V5.json", redzlib.Save)
+			cleolib.Save.UISize = {MainFrame.Size.X.Offset, MainFrame.Size.Y.Offset}
+			SaveJson("Cleostrap/Main/Configs/Library.json", cleolib.Save)
 		end
 	end)
 	
 	ConnectSave(ControlSize2, function()
-		redzlib.Save.TabSize = MainScroll.Size.X.Offset
-		SaveJson("redz library V5.json", redzlib.Save)
+		cleolib.Save.TabSize = MainScroll.Size.X.Offset
+		SaveJson("Cleostrap/Main/Configs/Library.json", cleolib.Save)
 	end)
 	
 	local ButtonsFolder = Create("Folder", TopBar, {
@@ -754,7 +707,7 @@ function redzlib:MakeWindow(Configs)
 	local Minimized, SaveSize, WaitClick
 	local Window, FirstTab = {}, false
 	function Window:Visible(bool: boolean)
-		game.CoreGui["redz Library V5"].Enabled = bool
+		game.CoreGui["Cleostrap Library"].Enabled = bool
 	end
 	function Window:CloseBtn()
 		local Dialog = Window:Dialog({
@@ -886,7 +839,6 @@ function redzlib:MakeWindow(Configs)
 		local Screen = InsertTheme(Create("Frame", MainFrame, {
 			BackgroundTransparency = 0.6,
 			Active = true,
-			BackgroundColor3 = Theme["Color Hub 2"],
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Theme["Color Stroke"],
 			Name = "Dialog"
@@ -915,7 +867,7 @@ function redzlib:MakeWindow(Configs)
 			
 			for _,Button in pairs(ButtonsHolder:GetChildren()) do
 				if Button:IsA("TextButton") then
-					Button.Size = UDim2.new(1 / ButtonCount, -(((ButtonCount - 1) * 20) / ButtonCount), 0, 32) -- Fluent Library :)
+					Button.Size = UDim2.new(1 / ButtonCount, -(((ButtonCount - 1) * 20) / ButtonCount), 0, 32)
 				end
 			end
 			Button.Activated:Connect(Dialog.Close)
@@ -934,9 +886,9 @@ function redzlib:MakeWindow(Configs)
 	end
 	function Window:SelectTab(TabSelect)
 		if type(TabSelect) == "number" then
-			redzlib.Tabs[TabSelect].func:Enable()
+			cleolib.Tabs[TabSelect].func:Enable()
 		else
-			for _,Tab in pairs(redzlib.Tabs) do
+			for _,Tab in pairs(cleolib.Tabs) do
 				if Tab.Cont == TabSelect.Cont then
 					Tab.func:Enable()
 				end
@@ -950,7 +902,7 @@ function redzlib:MakeWindow(Configs)
 		local TName = Configs[1] or Configs.Title or "Tab!"
 		local TIcon = Configs[2] or Configs.Icon or ""
 		
-		TIcon = redzlib:GetIcon(TIcon)
+		TIcon = cleolib:GetIcon(TIcon)
 		if not TIcon:find("rbxassetid://") or TIcon:gsub("rbxassetid://", ""):len() < 6 then
 			TIcon = false
 		end
@@ -1026,7 +978,7 @@ function redzlib:MakeWindow(Configs)
 			end
 			Container.Parent = Containers
 			Container.Size = UDim2.new(1, 0, 1, 150)
-			table.foreach(redzlib.Tabs, function(_,Tab)
+			table.foreach(cleolib.Tabs, function(_,Tab)
 				if Tab.Cont ~= Container then
 					Tab.func:Disable()
 				end
@@ -1041,7 +993,7 @@ function redzlib:MakeWindow(Configs)
 		
 		FirstTab = true
 		local Tab = {}
-		table.insert(redzlib.Tabs, {TabInfo = {Name = TName, Icon = TIcon}, func = Tab, Cont = Container})
+		table.insert(cleolib.Tabs, {TabInfo = {Name = TName, Icon = TIcon}, func = Tab, Cont = Container})
 		Tab.Cont = Container
 		
 		function Tab:Disable()
@@ -1082,7 +1034,7 @@ function redzlib:MakeWindow(Configs)
 			}), "Text")
 			
 			local Section = {}
-			table.insert(redzlib.Options, {type = "Section", Name = SectionName, func = Section})
+			table.insert(cleolib.Options, {type = "Section", Name = SectionName, func = Section})
 			function Section:Visible(Bool)
 				if Bool == nil then SectionFrame.Visible = not SectionFrame.Visible return end
 				SectionFrame.Visible = Bool
@@ -1181,12 +1133,12 @@ function redzlib:MakeWindow(Configs)
 				AnchorPoint = Vector2.new(0.5, 0.5)
 			})
 			
-			local Toggle = InsertTheme(Create("Frame", Slider, {
+			local ToggleKnob = InsertTheme(Create("Frame", Slider, {
 				Size = UDim2.new(0, 12, 0, 12),
 				Position = UDim2.new(0, 0, 0.5),
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = Theme["Color Theme"]
-			}), "Theme")Make("Corner", Toggle, UDim.new(0.5, 0))
+			}), "Theme")Make("Corner", ToggleKnob, UDim.new(0.5, 0))
 			
 			local WaitClick = false
 			local function SetToggle(Val)
@@ -1195,15 +1147,14 @@ function redzlib:MakeWindow(Configs)
 				WaitClick, Default = true, Val
 				SetFlag(Flag, Default)
 				Funcs:FireCallback(Callback, Default)
-				--print("fire")
 				if tostring(Default) == "true" then
-					CreateTween({Toggle, "Position", UDim2.new(1, 0, 0.5), 0.25})
-					CreateTween({Toggle, "BackgroundTransparency", 0, 0.25})
-					CreateTween({Toggle, "AnchorPoint", Vector2.new(1, 0.5), 0.25, Wait or false})
+					CreateTween({ToggleKnob, "Position", UDim2.new(1, 0, 0.5), 0.25})
+					CreateTween({ToggleKnob, "BackgroundTransparency", 0, 0.25})
+					CreateTween({ToggleKnob, "AnchorPoint", Vector2.new(1, 0.5), 0.25, false})
 				else
-					CreateTween({Toggle, "Position", UDim2.new(0, 0, 0.5), 0.25})
-					CreateTween({Toggle, "BackgroundTransparency", 0.8, 0.25})
-					CreateTween({Toggle, "AnchorPoint", Vector2.new(0, 0.5), 0.25, Wait or false})
+					CreateTween({ToggleKnob, "Position", UDim2.new(0, 0, 0.5), 0.25})
+					CreateTween({ToggleKnob, "BackgroundTransparency", 0.8, 0.25})
+					CreateTween({ToggleKnob, "AnchorPoint", Vector2.new(0, 0.5), 0.25, false})
 				end
 				WaitClick = false
 			end;task.spawn(SetToggle, Default)
@@ -1211,7 +1162,6 @@ function redzlib:MakeWindow(Configs)
 			Button.Activated:Connect(function()
 				SetToggle(not Default)
 			end)
-	
 			
 			local Toggle = {}
 			function Toggle:Retoggle()
@@ -1223,7 +1173,7 @@ function redzlib:MakeWindow(Configs)
 			function Toggle:Toggle(bool: boolean) SetToggle(bool) end
 			function Toggle:Visible(...) Funcs:ToggleVisible(Button, ...) end
 			function Toggle:Destroy() Button:Destroy() end
-			function Toggle:Callback(...) Funcs:InsertCallback(Callback, ...)() end
+			function Toggle:Callback(...) Funcs:InsertCallback(Callback, ...) end
 			function Toggle:Set(Val1, Val2)
 				if type(Val1) == "string" and type(Val2) == "string" then
 					LabelFunc:SetTitle(Val1)
@@ -1231,7 +1181,6 @@ function redzlib:MakeWindow(Configs)
 				elseif type(Val1) == "string" then
 					LabelFunc:SetTitle(Val1, false, true)
 				elseif type(Val1) == "boolean" then
-					--print("yea")
 					Toggle:Toggle(Val1)
 				elseif type(Val1) == "function" then
 					Callback = Val1
@@ -1428,7 +1377,7 @@ function redzlib:MakeWindow(Configs)
 						end
 					end
 					UpdateLabel()
-					if Bloxstrap.canUpdate then Minimize() end
+					if Cleostrap.canUpdate then Minimize() end
 				end
 				
 				local function Select(Option)
@@ -1542,12 +1491,12 @@ function redzlib:MakeWindow(Configs)
 			local Dropdown = {}
 			function Dropdown:Visible(...) Funcs:ToggleVisible(Button, ...) end
 			function Dropdown:Destroy() Button:Destroy() end
-			function Dropdown:Callback(...) Funcs:InsertCallback(Callback, ...)(Selected) end
+			function Dropdown:Callback(...) Funcs:InsertCallback(Callback, ...) end
 			
 			function Dropdown:Add(...)
 				local NewOptions = {...}
 				if type(NewOptions[1]) == "table" then
-					table.foreach(Option, function(_,Name)
+					table.foreach(NewOptions[1], function(_,Name)
 						AddOption(Name)
 					end)
 				else
@@ -1718,7 +1667,7 @@ function redzlib:MakeWindow(Configs)
 					SetSlider(NewVal1)
 				end
 			end
-			function Slider:Callback(...) Funcs:InsertCallback(Callback, ...)(tonumber(Default)) end
+			function Slider:Callback(...) Funcs:InsertCallback(Callback, ...) end
 			function Slider:Visible(...) Funcs:ToggleVisible(Button, ...) end
 			function Slider:Destroy() Button:Destroy() end
 			return Slider
@@ -1900,4 +1849,4 @@ function redzlib:MakeWindow(Configs)
 	return Window
 end
 
-return redzlib
+return cleolib
