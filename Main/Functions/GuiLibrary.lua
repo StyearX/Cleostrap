@@ -736,8 +736,41 @@ function cleolib:MakeWindow(Configs)
 			TextSize = 8,
 			Font = Enum.Font.Gotham,
 			Name = "SubTitle"
-		}), "DarkText")
+		}), "DarkText"),
+		-- GitHub link icon to the right of the subtitle
+		Create("ImageButton", {
+			Size = UDim2.fromOffset(14, 14),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(1, 5, 0.5),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://116676049108126",
+			ImageColor3 = Theme["Color Dark Text"],
+			Name = "GitHubLink"
+		})
 	}), "Text")
+
+	-- GitHub button opens the repo URL via setclipboard (executors don't support
+	-- opening URLs directly; copying it is the standard approach)
+	local GitHubBtn = Title:FindFirstChild("GitHubLink")
+	if GitHubBtn then
+		InsertTheme(GitHubBtn, "DarkText")
+		GitHubBtn.MouseButton1Click:Connect(function()
+			pcall(setclipboard, "https://github.com/StyearX/Cleostrap")
+			pcall(function()
+				game:GetService("StarterGui"):SetCore("SendNotification", {
+					Title = "Cleostrap",
+					Text = "GitHub link copied to clipboard!",
+					Duration = 4
+				})
+			end)
+		end)
+		GitHubBtn.MouseEnter:Connect(function()
+			GitHubBtn.ImageColor3 = Theme["Color Text"]
+		end)
+		GitHubBtn.MouseLeave:Connect(function()
+			GitHubBtn.ImageColor3 = Theme["Color Dark Text"]
+		end)
+	end
 	
 	local MainScroll = InsertTheme(Create("ScrollingFrame", Components, {
 		Size = UDim2.new(0, cleolib.Save.TabSize, 1, -TopBar.Size.Y.Offset),
