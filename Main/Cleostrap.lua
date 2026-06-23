@@ -98,53 +98,6 @@ end
 -- Walks descendants looking for a child literally named "chat", then the
 -- numeric "5" subframe is resolved by scanning that child's children instead
 -- of indexing it directly.
-local function FindChatMenuFrame(topBar: Instance?)
-	if not topBar then return nil end
-	local ok, unibarMenu = pcall(function()
-		local left = topBar:FindFirstChild("UnibarLeftFrame")
-		return left and left:FindFirstChild("UnibarMenu")
-	end)
-	if not ok or not unibarMenu then return nil end
-
-	local chat
-	for _, descendant in unibarMenu:GetDescendants() do
-		if descendant.Name == "chat" then
-			chat = descendant
-			break
-		end
-	end
-	if not chat then return nil end
-
-	-- the "5" subframe historically holds the badge/label; find it by scanning
-	-- chat's children for the first Frame-like child instead of hardcoding "5"
-	local sub = chat:FindFirstChild("5")
-	if not sub then
-		for _, child in chat:GetChildren() do
-			if child:IsA("GuiObject") then
-				sub = child
-				break
-			end
-		end
-	end
-	return chat, sub
-end
-
-local function FindNineDotMenuFrame(topBar: Instance?)
-	if not topBar then return nil end
-	local ok, unibarMenu = pcall(function()
-		local left = topBar:FindFirstChild("UnibarLeftFrame")
-		return left and left:FindFirstChild("UnibarMenu")
-	end)
-	if not ok or not unibarMenu then return nil end
-
-	for _, descendant in unibarMenu:GetDescendants() do
-		if descendant.Name == "nine_dot" then
-			return descendant
-		end
-	end
-	return nil
-end
-
 Cleostrap.ToggleFFlag = loadFunc("ToggleFFlag")
 Cleostrap.GetFFlag = loadFunc("GetFFlag")
 Cleostrap.start = function(vis: boolean?)
@@ -391,148 +344,10 @@ Appearance:AddDropdown({
 })
 Appearance:AddSection({'Customizations', 'palette'})
 local gradients = {}
-local fakerobloxbutton
-local topBarApp = GetTopBar()
-
-pcall(function()
-	if not topBarApp then return end
-	local unibarLeft = topBarApp:FindFirstChild("UnibarLeftFrame")
-	if not unibarLeft then return end
-
-	fakerobloxbutton = Instance.new('TextButton', unibarLeft)
-	fakerobloxbutton.BorderSizePixel = 0
-	fakerobloxbutton.BackgroundTransparency = 0.07
-	fakerobloxbutton.Text = ''
-	fakerobloxbutton.Name = 'funni'
-	fakerobloxbutton.ZIndex = 999
-	fakerobloxbutton.BackgroundColor3 = Color3.new()
-	fakerobloxbutton.Size = UDim2.new(0, 44, 0, 44)
-	fakerobloxbutton.Position = UDim2.new(0, -52, 0, 0)
-	fakerobloxbutton.Visible = false
-	fakerobloxbutton.MouseButton1Click:Connect(function()
-		pcall(function()
-			local bar = GetTopBar()
-			local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
-			local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
-			local background = triggerPoint and triggerPoint:FindFirstChild("Background")
-			if background and background:FindFirstChild("Activated") then
-				firesignal(background.Activated)
-			end
-		end)
-	end)
-
-	local fakeRobloxImage = Instance.new('ImageLabel', fakerobloxbutton)
-	fakeRobloxImage.Size = UDim2.new(0, 22, 0, 22)
-	fakeRobloxImage.Position = UDim2.new(0.25, 0, 0.25, 0)
-	fakeRobloxImage.BackgroundTransparency = 1
-	fakeRobloxImage.Image = getcustomasset('Cleostrap/icon.png')
-	fakeRobloxImage.ImageColor3 = Color3.new(1, 1, 1)
-
-	Instance.new('UICorner', fakerobloxbutton).CornerRadius = UDim.new(1, 0)
-end)
-
-local fakeRobloxImage = fakerobloxbutton and fakerobloxbutton:FindFirstChildOfClass("ImageLabel")
-
-local customtopbar
-local topbarChatConnection
-customtopbar = Appearance:AddToggle({
-	Name = 'Cleostrap Topbars',
-	Description = 'Gives you a cool unique topbar.',
-	Default = Cleostrap.Config.customtopbar,
-	Callback = function(call)
-		Cleostrap.UpdateConfig('customtopbar', call)
-		if not fakerobloxbutton then
-			Cleostrap.error("Cleostrap Topbars isn't supported on this client version.")
-			return
-		end
-
-		local ok = pcall(function()
-			local bar = GetTopBar()
-			local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
-			local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
-			if triggerPoint then
-				triggerPoint.Visible = not call
-			end
-			fakerobloxbutton.Visible = call
-
-			local chat, chatSub = FindChatMenuFrame(bar)
-			local nineDot = FindNineDotMenuFrame(bar)
-
-			local topbarinstances = {}
-			if chat then
-				local integrationIconFrame = chat:FindFirstChild("IntegrationIconFrame")
-				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
-				if integrationIcon then table.insert(topbarinstances, integrationIcon) end
-			end
-			if nineDot then
-				local integrationIconFrame = nineDot:FindFirstChild("IntegrationIconFrame")
-				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
-				if integrationIcon then
-					local overflow = integrationIcon:FindFirstChild("Overflow")
-					local close = integrationIcon:FindFirstChild("Close")
-					if overflow then table.insert(topbarinstances, overflow) end
-					if close then table.insert(topbarinstances, close) end
-				end
-			end
-			if fakeRobloxImage then table.insert(topbarinstances, fakeRobloxImage) end
-
-			if call then
-				if chat then
-					topbarChatConnection = chat.ChildAdded:Connect(function(v)
-						local grad = Instance.new('UIGradient', v)
-						grad.Rotation = -60
-						grad.Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-						})
-						if v:FindFirstChild("Text") then
-							v.Text.TextColor3 = Color3.new()
-							v.Text.TextTruncate = 'None'
-						end
-						table.insert(gradients, grad)
-					end)
-				end
-				if chatSub then
-					local badge = chatSub:FindFirstChild('Badge')
-					if badge then
-						local grad = Instance.new('UIGradient', badge)
-						if badge:FindFirstChild("Text") then
-							badge.Text.TextTruncate = 'None'
-							badge.Text.TextColor3 = Color3.new()
-						end
-						grad.Rotation = -60
-						grad.Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-						})
-						table.insert(gradients, grad)
-					end
-				end
-				for _, v in topbarinstances do
-					local grad = Instance.new('UIGradient', v)
-					grad.Rotation = 60
-					grad.Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-					})
-					table.insert(gradients, grad)
-				end
-			else
-				pcall(function() topbarChatConnection:Disconnect() end)
-				for _, v in gradients do pcall(function() v:Destroy() end) end
-				table.clear(gradients)
-			end
-		end)
-
-		if not ok then
-			Cleostrap.error("Cleostrap Topbars couldn't fully apply on this client version.")
-		end
-	end
-})
 
 local rotatinghotbar = Appearance:AddToggle({
 	Name = 'Spin Hotbar',
-	Description = 'Spins the roblox logo around for whatever reason.',
+	Description = 'Spins the Roblox logo in the topbar.',
 	Default = Cleostrap.Config.RotatingHotbar,
 	Callback = function(call)
 		Cleostrap.UpdateConfig('RotatingHotbar', call)
@@ -550,12 +365,10 @@ local rotatinghotbar = Appearance:AddToggle({
 		if call then
 			repeat
 				scalingIcon.Rotation += 1.5
-				if fakeRobloxImage then fakeRobloxImage.Rotation += 1.5 end
 				task.wait(0)
 			until not Cleostrap.Config.RotatingHotbar
 		else
 			scalingIcon.Rotation = 0
-			if fakeRobloxImage then fakeRobloxImage.Rotation = 0 end
 		end
 	end
 })
@@ -1022,74 +835,93 @@ do
 	local CoreGuiService = cloneref(game:GetService("CoreGui"))
 	local localPlayer = cloneref(game:GetService("Players")).LocalPlayer
 
-	local function makeButtonInFrame(parentFrame)
-		local frame = Instance.new("Frame", parentFrame)
-		frame.Size = UDim2.new(0, 44, 0, 44)
-		frame.BackgroundColor3 = Color3.fromRGB(18, 18, 21)
-		frame.BackgroundTransparency = 0.08
-		Instance.new("UICorner", frame).CornerRadius = UDim.new(1, 0)
+	-- New icon: rbxassetid://75361230922976 (gradient orange→pink→purple)
+	-- Gradient matches the icon's own colors for a cohesive look
+	local ICON_ID = "rbxassetid://75361230922976"
+	local GRAD_COLOR = ColorSequence.new({
+		ColorSequenceKeypoint.new(0,   Color3.fromRGB(255, 130, 50)),   -- orange
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 60,  140)),  -- pink
+		ColorSequenceKeypoint.new(1,   Color3.fromRGB(110, 40,  220))   -- purple
+	})
 
-		button = Instance.new("TextButton", frame)
+	local function buildButton(parent)
+		local container = Instance.new("Frame", parent)
+		container.Size = UDim2.new(0, 44, 0, 44)
+		container.BackgroundColor3 = Color3.fromRGB(18, 18, 21)
+		container.BackgroundTransparency = 0.08
+		container.BorderSizePixel = 0
+		container.Name = "CleostrapToggle"
+		Instance.new("UICorner", container).CornerRadius = UDim.new(1, 0)
+
+		button = Instance.new("TextButton", container)
 		button.Size = UDim2.new(1, 0, 1, 0)
 		button.BackgroundTransparency = 1
 		button.Text = ""
 		button.BorderSizePixel = 0
+		button.ZIndex = 10
 
-		local toggleImage = Instance.new("ImageLabel", button)
-		toggleImage.Size = UDim2.new(0, 22, 0, 22)
-		toggleImage.Position = UDim2.new(0.5, -11, 0.5, -11)
-		toggleImage.BackgroundTransparency = 1
-		toggleImage.Image = getcustomasset("Cleostrap/icon.png")
-		toggleImage.ImageColor3 = Color3.new(1, 1, 1)
+		local img = Instance.new("ImageLabel", button)
+		img.Size = UDim2.new(0, 26, 0, 26)
+		img.Position = UDim2.new(0.5, -13, 0.5, -13)
+		img.BackgroundTransparency = 1
+		img.Image = ICON_ID
+		img.ScaleType = Enum.ScaleType.Fit
 
-		grad = Instance.new("UIGradient", toggleImage)
-		grad.Rotation = 60
-		grad.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-		})
+		-- Gradient tint on the icon to match theme
+		grad = Instance.new("UIGradient", img)
+		grad.Rotation = 135
+		grad.Color = GRAD_COLOR
 		grad.Enabled = CoreGuiService["Cleostrap Library"].Enabled
 
 		button.MouseButton1Click:Connect(function()
-			CoreGuiService["Cleostrap Library"].Enabled = not grad.Enabled
-			grad.Enabled = not grad.Enabled
+			local newState = not CoreGuiService["Cleostrap Library"].Enabled
+			CoreGuiService["Cleostrap Library"].Enabled = newState
+			grad.Enabled = newState
 		end)
 	end
 
-	-- Check if game uses TopbarPlus (PlayerGui.TopbarStandard exists)
-	local hasTopbarPlus = localPlayer:WaitForChild("PlayerGui", 5) and
-		localPlayer.PlayerGui:FindFirstChild("TopbarStandard") ~= nil
-
+	-- Prefer TopbarPlus if it exists in PlayerGui
 	local ok = pcall(function()
-		if hasTopbarPlus then
-			-- TopbarPlus detected: inject into its Left holder so we sit
-			-- alongside existing TopbarPlus icons without overlapping.
-			local holder = localPlayer.PlayerGui.TopbarStandard.Holders.Left
-			makeButtonInFrame(holder)
+		local pg = localPlayer:WaitForChild("PlayerGui", 3)
+		local topbarStandard = pg and pg:FindFirstChild("TopbarStandard")
+
+		if topbarStandard then
+			-- TopbarPlus detected: add to its Left holder
+			local left = topbarStandard:FindFirstChild("Holders")
+				and topbarStandard.Holders:FindFirstChild("Left")
+			if not left then error("no left holder") end
+			buildButton(left)
 		else
-			-- No TopbarPlus: build our own minimal topbar container
-			-- inside CoreGui.TopBarApp.TopBarApp (double-nested, confirmed structure).
+			-- Vanilla Roblox topbar: inject BELOW the topbar using the
+			-- confirmed double-nested TopBarApp.TopBarApp structure.
+			-- We position our button to the right of the Roblox menu button
+			-- (offset 172px) WITHOUT touching UnibarLeftFrame so native
+			-- voice/chat/menu icons are completely unaffected.
 			local topBarApp = GetTopBar()
-			if not topBarApp then error("TopBarApp not found") end
+			if not topBarApp then error("no topBarApp") end
+
+			-- Clean up any previous container from a prior run
+			local existing = topBarApp:FindFirstChild("CleostrapTopbarHolder")
+			if existing then existing:Destroy() end
 
 			local frame1 = Instance.new("Frame", topBarApp)
+			frame1.Name = "CleostrapTopbarHolder"
 			frame1.Size = UDim2.new(1, 0, 0, 48)
 			frame1.Position = UDim2.new(0, 0, 0, 10)
 			frame1.BackgroundTransparency = 1
-			frame1.Name = "CleostrapTopbarHolder"
 
 			local frame2 = Instance.new("Frame", frame1)
 			frame2.Size = UDim2.new(1, 0, 0, 44)
 			frame2.Position = UDim2.new(0, 172, 0, 2)
 			frame2.BackgroundTransparency = 1
 
-			local uiListLayout = Instance.new("UIListLayout", frame2)
-			uiListLayout.Padding = UDim.new(0, 12)
-			uiListLayout.FillDirection = Enum.FillDirection.Horizontal
-			uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-			uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+			local uiList = Instance.new("UIListLayout", frame2)
+			uiList.Padding = UDim.new(0, 12)
+			uiList.FillDirection = Enum.FillDirection.Horizontal
+			uiList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			uiList.VerticalAlignment = Enum.VerticalAlignment.Bottom
 
-			makeButtonInFrame(frame2)
+			buildButton(frame2)
 		end
 	end)
 
@@ -1099,7 +931,8 @@ do
 			CoreGuiService["Cleostrap Library"].Enabled = callback
 		end
 	else
-		Cleostrap.error("Couldn't add the topbar icon. Use the keybind or menu to toggle the GUI.")
+		-- Graceful fallback: GUI still works, just no topbar icon
+		Cleostrap.error("Couldn't create the topbar icon. GUI is still accessible.")
 		Cleostrap.Visible = function(callback)
 			CoreGuiService["Cleostrap Library"].Enabled = callback
 		end
