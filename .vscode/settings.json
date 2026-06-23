@@ -1,7 +1,7 @@
 {
     "robloxLsp.diagnostics.globals": [
         "setfpscap",
-        "Bloxstrap",
+        "Cleostrap",
         "sethiddenproperty",
         "writefile",
         "isfile",
@@ -11,8 +11,8 @@
         "setfflag",
         "getfflag",
         "loadfile",
-        "bloxstrap",
-        "bloxstrap",
+        "Cleostrap",
+        "Cleostrap",
         "makefolder",
         "Bool",
         "props"
