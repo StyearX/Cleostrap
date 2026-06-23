@@ -190,7 +190,7 @@ Appearance:AddSection({'Theme', 'swatch-book'})
 Appearance:AddDropdown({
     Name = 'Theme',
     Description = 'Changes the color scheme of the Cleostrap window.',
-    Options = {'Darker', 'Dark', 'Purple'},
+    Options = {'Darker', 'Dark', 'Purple', 'Midnight', 'Rose', 'Forest', 'Ocean', 'Sunset'},
     Default = GUI.Save.Theme,
     Callback = function(val)
         GUI:SetTheme(val)
@@ -1019,54 +1019,89 @@ Cleostrap.canUpdate = true
 do
 	local button
 	local grad
+	local CoreGuiService = cloneref(game:GetService("CoreGui"))
+	local localPlayer = cloneref(game:GetService("Players")).LocalPlayer
 
-	local ok = pcall(function()
-		local bar = GetTopBar()
-		local unibarLeft = bar and bar:FindFirstChild("UnibarLeftFrame")
-		if not unibarLeft then error("UnibarLeftFrame not found") end
+	local function makeButtonInFrame(parentFrame)
+		local frame = Instance.new("Frame", parentFrame)
+		frame.Size = UDim2.new(0, 44, 0, 44)
+		frame.BackgroundColor3 = Color3.fromRGB(18, 18, 21)
+		frame.BackgroundTransparency = 0.08
+		Instance.new("UICorner", frame).CornerRadius = UDim.new(1, 0)
 
-		button = Instance.new('TextButton', unibarLeft)
+		button = Instance.new("TextButton", frame)
+		button.Size = UDim2.new(1, 0, 1, 0)
+		button.BackgroundTransparency = 1
+		button.Text = ""
 		button.BorderSizePixel = 0
-		button.BackgroundTransparency = 0.07
-		button.Text = ''
-		button.BackgroundColor3 = Color3.new()
-		button.Size = UDim2.new(0, 44, 0, 44)
-		button.Position = UDim2.new(0, 103, 0, 0)
 
-		local toggleImage = Instance.new('ImageLabel', button)
+		local toggleImage = Instance.new("ImageLabel", button)
 		toggleImage.Size = UDim2.new(0, 22, 0, 22)
-		toggleImage.Position = UDim2.new(0.25, 0, 0.25, 0)
+		toggleImage.Position = UDim2.new(0.5, -11, 0.5, -11)
 		toggleImage.BackgroundTransparency = 1
-		toggleImage.Image = getcustomasset('Cleostrap/icon.png')
+		toggleImage.Image = getcustomasset("Cleostrap/icon.png")
 		toggleImage.ImageColor3 = Color3.new(1, 1, 1)
 
-		grad = Instance.new('UIGradient', toggleImage)
+		grad = Instance.new("UIGradient", toggleImage)
 		grad.Rotation = 60
 		grad.Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
 			ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
 		})
-		grad.Enabled = game:GetService('CoreGui')["Cleostrap Library"].Enabled
+		grad.Enabled = CoreGuiService["Cleostrap Library"].Enabled
 
-		Instance.new('UICorner', button).CornerRadius = UDim.new(1, 0)
 		button.MouseButton1Click:Connect(function()
-			game:GetService('CoreGui')["Cleostrap Library"].Enabled = not grad.Enabled
+			CoreGuiService["Cleostrap Library"].Enabled = not grad.Enabled
 			grad.Enabled = not grad.Enabled
 		end)
+	end
+
+	-- Check if game uses TopbarPlus (PlayerGui.TopbarStandard exists)
+	local hasTopbarPlus = localPlayer:WaitForChild("PlayerGui", 5) and
+		localPlayer.PlayerGui:FindFirstChild("TopbarStandard") ~= nil
+
+	local ok = pcall(function()
+		if hasTopbarPlus then
+			-- TopbarPlus detected: inject into its Left holder so we sit
+			-- alongside existing TopbarPlus icons without overlapping.
+			local holder = localPlayer.PlayerGui.TopbarStandard.Holders.Left
+			makeButtonInFrame(holder)
+		else
+			-- No TopbarPlus: build our own minimal topbar container
+			-- inside CoreGui.TopBarApp.TopBarApp (double-nested, confirmed structure).
+			local topBarApp = GetTopBar()
+			if not topBarApp then error("TopBarApp not found") end
+
+			local frame1 = Instance.new("Frame", topBarApp)
+			frame1.Size = UDim2.new(1, 0, 0, 48)
+			frame1.Position = UDim2.new(0, 0, 0, 10)
+			frame1.BackgroundTransparency = 1
+			frame1.Name = "CleostrapTopbarHolder"
+
+			local frame2 = Instance.new("Frame", frame1)
+			frame2.Size = UDim2.new(1, 0, 0, 44)
+			frame2.Position = UDim2.new(0, 172, 0, 2)
+			frame2.BackgroundTransparency = 1
+
+			local uiListLayout = Instance.new("UIListLayout", frame2)
+			uiListLayout.Padding = UDim.new(0, 12)
+			uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+			uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+			uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+
+			makeButtonInFrame(frame2)
+		end
 	end)
 
-	-- Cleostrap.Visible must always exist, even if the topbar icon couldn't be
-	-- created on this client version, otherwise Initiate.lua's call to it errors
-	-- and the whole GUI never opens.
 	if ok and button then
 		Cleostrap.Visible = function(callback)
 			button.Visible = callback
-			game:GetService('CoreGui')["Cleostrap Library"].Enabled = callback
+			CoreGuiService["Cleostrap Library"].Enabled = callback
 		end
 	else
-		Cleostrap.error("Couldn't add the topbar icon on this client version. Use the keybind/menu to toggle the GUI instead.")
+		Cleostrap.error("Couldn't add the topbar icon. Use the keybind or menu to toggle the GUI.")
 		Cleostrap.Visible = function(callback)
-			game:GetService('CoreGui')["Cleostrap Library"].Enabled = callback
+			CoreGuiService["Cleostrap Library"].Enabled = callback
 		end
 	end
 end
