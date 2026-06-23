@@ -72,6 +72,79 @@ Cleostrap.error = notif
 Cleostrap.success = notif
 Cleostrap.info = notif
 
+-- TopBar resolution: Roblox's internal TopBarApp structure is undocumented
+-- and changes between client versions (confirmed nested as TopBarApp.TopBarApp.*).
+-- These helpers resolve it safely with a timeout instead of hard-indexing,
+-- so a missing/renamed instance degrades gracefully instead of erroring.
+local function GetTopBar(timeoutSeconds: number?)
+	local CoreGui = cloneref(game:GetService("CoreGui"))
+	local ok, outer = pcall(function()
+		return CoreGui:WaitForChild("TopBarApp", timeoutSeconds or 5)
+	end)
+	if not ok or not outer then return nil end
+
+	local ok2, inner = pcall(function()
+		return outer:WaitForChild("TopBarApp", timeoutSeconds or 5)
+	end)
+	if ok2 and inner then
+		return inner
+	end
+	-- some client versions are not double-nested; fall back to the outer instance
+	return outer
+end
+
+-- Finds the chat menu frame inside UnibarMenu without relying on brittle
+-- numeric index names (e.g. ["2"]["3"]) which Roblox can reassign at any time.
+-- Walks descendants looking for a child literally named "chat", then the
+-- numeric "5" subframe is resolved by scanning that child's children instead
+-- of indexing it directly.
+local function FindChatMenuFrame(topBar: Instance?)
+	if not topBar then return nil end
+	local ok, unibarMenu = pcall(function()
+		local left = topBar:FindFirstChild("UnibarLeftFrame")
+		return left and left:FindFirstChild("UnibarMenu")
+	end)
+	if not ok or not unibarMenu then return nil end
+
+	local chat
+	for _, descendant in unibarMenu:GetDescendants() do
+		if descendant.Name == "chat" then
+			chat = descendant
+			break
+		end
+	end
+	if not chat then return nil end
+
+	-- the "5" subframe historically holds the badge/label; find it by scanning
+	-- chat's children for the first Frame-like child instead of hardcoding "5"
+	local sub = chat:FindFirstChild("5")
+	if not sub then
+		for _, child in chat:GetChildren() do
+			if child:IsA("GuiObject") then
+				sub = child
+				break
+			end
+		end
+	end
+	return chat, sub
+end
+
+local function FindNineDotMenuFrame(topBar: Instance?)
+	if not topBar then return nil end
+	local ok, unibarMenu = pcall(function()
+		local left = topBar:FindFirstChild("UnibarLeftFrame")
+		return left and left:FindFirstChild("UnibarMenu")
+	end)
+	if not ok or not unibarMenu then return nil end
+
+	for _, descendant in unibarMenu:GetDescendants() do
+		if descendant.Name == "nine_dot" then
+			return descendant
+		end
+	end
+	return nil
+end
+
 Cleostrap.ToggleFFlag = loadFunc("ToggleFFlag")
 Cleostrap.GetFFlag = loadFunc("GetFFlag")
 Cleostrap.start = function(vis: boolean?)
@@ -84,6 +157,23 @@ Cleostrap.start = function(vis: boolean?)
 
 	if not isfolder("Cleostrap/Logs") then makefolder("Cleostrap/Logs") end
 	getgenv().errorlog = getgenv().errorlog or "Cleostrap/Logs/crashlog"..HttpService:GenerateGUID(false)..".txt"
+
+	-- Pre-load the icon module synchronously before building the GUI.
+	-- GuiLibrary.lua reads getgenv().CleostrapIcons so every MakeTab/AddSection
+	-- call can resolve icons without triggering a network fetch mid-render.
+	if not getgenv().CleostrapIcons then
+		local ok, Icons = pcall(function()
+			return loadfile("Cleostrap/Main/Functions/Icons.lua")()()
+		end)
+		getgenv().CleostrapIcons = (ok and Icons and Icons.Loaded) and Icons or {
+			GetIcon      = function() return nil end,
+			Icon         = function() return nil end,
+			Icon2        = function() return nil end,
+			SetIconsType = function() end,
+			Loaded       = false
+		}
+	end
+
 	local GUI: table = loadfile("Cleostrap/Main/Functions/GuiLibrary.lua")()
 	local main: table? = GUI:MakeWindow({
 		Title = "Cleostrap",
@@ -92,16 +182,26 @@ Cleostrap.start = function(vis: boolean?)
 	})
 	main:Visible(vis)
 
-local Integrations: tab = main:MakeTab({"Integrations", "cross"})
+local Integrations: tab = main:MakeTab({"Integrations", "plug"})
 local FastFlags: tab = main:MakeTab({"Mods", "wrench"})
 local EngineSettings: tab = main:MakeTab({"Engine Settings", "flag"})
 local Appearance: tab = main:MakeTab({"Appearance", "paintbrush-2"})
-Appearance:AddSection('Player')
+Appearance:AddSection({'Theme', 'swatch-book'})
+Appearance:AddDropdown({
+    Name = 'Theme',
+    Description = 'Changes the color scheme of the Cleostrap window.',
+    Options = {'Darker', 'Dark', 'Purple'},
+    Default = GUI.Save.Theme,
+    Callback = function(val)
+        GUI:SetTheme(val)
+    end
+})
+Appearance:AddSection({'Player', 'user'})
 local storeeffects = {}
 local isalive = function(v)
       v = v or lplr
       local a, b = pcall(function()
-          return v.Character and v.Character.PrimaryPart and v.Character:FindFirstChild('Humanoid') and v.Character.Humanoid.Health > 0
+          return v.Character and v.Character:FindFirstChild('HumanoidRootPart') and v.Character:FindFirstChild('Humanoid') and v.Character.Humanoid.Health > 0
       end)
       return a and b or false
 end
@@ -117,10 +217,12 @@ local derendering = Appearance:AddToggle({
                 for i,v in players:GetPlayers() do
                     if not isalive(lplr) then break end
                     if v ~= lplr and isalive(v) then
-                        local mag = (lplr.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).magnitude
-                        for i,v in v.Character.Humanoid:GetPlayingAnimationTracks() do
-                            v:AdjustSpeed(mag <= 100 and 1 or 0)
-                        end
+                        pcall(function()
+                            local mag = (lplr.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).magnitude
+                            for i,track in v.Character.Humanoid:GetPlayingAnimationTracks() do
+                                track:AdjustSpeed(mag <= 100 and 1 or 0)
+                            end
+                        end)
                     end
                 end
                 task.wait()
@@ -262,7 +364,7 @@ local crosshair = Appearance:AddToggle({
             until not Cleostrap.Config.Crosshair
         else
             for i,v in crosshaircons do
-                crosshaircons:Disconnect()
+                if v and v.Disconnect then v:Disconnect() end
             end
             table.clear(crosshaircons)
             if imagelabel then
@@ -273,115 +375,237 @@ local crosshair = Appearance:AddToggle({
 })
 Appearance:AddDropdown({
     Name = 'Image',
+    Description = 'Add image files to "Cleostrap/Images" to populate this list.',
     Options = listfiles('Cleostrap/Images'),
     Default = Cleostrap.Config.CrosshairImage,
     Callback = function(val)
         Cleostrap.UpdateConfig('CrosshairImage', val)
+        if type(val) ~= "string" or val:gsub(" ", ""):len() == 0 then
+            return
+        end
         chosenimage = getcustomasset(val)
         if imagelabel then
             imagelabel.Image = chosenimage
         end
     end
 })
-Appearance:AddSection('Customizations')
+Appearance:AddSection({'Customizations', 'palette'})
 local gradients = {}
 local fakerobloxbutton
-pcall(function() fakerobloxbutton = Instance.new('TextButton', game:GetService('CoreGui').TopBarApp.UnibarLeftFrame)
-fakerobloxbutton.BorderSizePixel = 0
-fakerobloxbutton.BackgroundTransparency = 0.07
-fakerobloxbutton.Text = ''
-fakerobloxbutton.Name = 'funni'
-fakerobloxbutton.ZIndex = 999
-fakerobloxbutton.BackgroundColor3 = Color3.new()
-fakerobloxbutton.Size = UDim2.new(0, 44, 0, 44)
-fakerobloxbutton.Position = UDim2.new(0, -52, 0, 0)
-fakerobloxbutton.Visible = false
-fakerobloxbutton.MouseButton1Click:Connect(function()
-    firesignal(game:GetService("CoreGui").TopBarApp.MenuIconHolder.TriggerPoint.Background.Activated)
+local topBarApp = GetTopBar()
+
+pcall(function()
+	if not topBarApp then return end
+	local unibarLeft = topBarApp:FindFirstChild("UnibarLeftFrame")
+	if not unibarLeft then return end
+
+	fakerobloxbutton = Instance.new('TextButton', unibarLeft)
+	fakerobloxbutton.BorderSizePixel = 0
+	fakerobloxbutton.BackgroundTransparency = 0.07
+	fakerobloxbutton.Text = ''
+	fakerobloxbutton.Name = 'funni'
+	fakerobloxbutton.ZIndex = 999
+	fakerobloxbutton.BackgroundColor3 = Color3.new()
+	fakerobloxbutton.Size = UDim2.new(0, 44, 0, 44)
+	fakerobloxbutton.Position = UDim2.new(0, -52, 0, 0)
+	fakerobloxbutton.Visible = false
+	fakerobloxbutton.MouseButton1Click:Connect(function()
+		pcall(function()
+			local bar = GetTopBar()
+			local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
+			local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
+			local background = triggerPoint and triggerPoint:FindFirstChild("Background")
+			if background and background:FindFirstChild("Activated") then
+				firesignal(background.Activated)
+			end
+		end)
+	end)
+
+	local fakeRobloxImage = Instance.new('ImageLabel', fakerobloxbutton)
+	fakeRobloxImage.Size = UDim2.new(0, 22, 0, 22)
+	fakeRobloxImage.Position = UDim2.new(0.25, 0, 0.25, 0)
+	fakeRobloxImage.BackgroundTransparency = 1
+	fakeRobloxImage.Image = getcustomasset('Cleostrap/icon.png')
+	fakeRobloxImage.ImageColor3 = Color3.new(1, 1, 1)
+
+	Instance.new('UICorner', fakerobloxbutton).CornerRadius = UDim.new(1, 0)
 end)
 
-local imagelabel = Instance.new('ImageLabel', fakerobloxbutton)
-imagelabel.Size = UDim2.new(0, 22, 0, 22)
-imagelabel.Position = UDim2.new(0.25, 0, 0.25, 0)
-imagelabel.BackgroundTransparency = 1
-imagelabel.Image = getcustomasset('Cleostrap/icon.png')
-imagelabel.ImageColor3 = Color3.new(1, 1, 1)
-
-Instance.new('UICorner', fakerobloxbutton).CornerRadius = UDim.new(1, 0) end)
-
+local fakeRobloxImage = fakerobloxbutton and fakerobloxbutton:FindFirstChildOfClass("ImageLabel")
 
 local customtopbar
 local topbarChatConnection
 customtopbar = Appearance:AddToggle({
-    Name = 'Cleostrap Topbars',
-    Description = 'Gives you a cool unique topbar.',
-    Default = Cleostrap.Config.customtopbar,
-    Callback = function(call)
-        game:GetService("CoreGui").TopBarApp.MenuIconHolder.TriggerPoint.Visible = not call
-        fakerobloxbutton.Visible = call 
-        Cleostrap.UpdateConfig('customtopbar', call)
-        local topbarinstances = {game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat.IntegrationIconFrame.IntegrationIcon, game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].nine_dot.IntegrationIconFrame.IntegrationIcon.Overflow, game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].nine_dot.IntegrationIconFrame.IntegrationIcon.Close, imagelabel}
-        if call then
-            topbarChatConnection = game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat["5"].ChildAdded:Connect(function(v)
-                local grad = Instance.new('UIGradient', v)
-                grad.Rotation = -60
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-                })
-                v.Text.TextColor3 = Color3.new()
-                v.Text.TextTruncate = 'None'
-                table.insert(gradients, grad)
-            end)
-            if game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat["5"]:FindFirstChild('Badge') then
-                local grad = Instance.new('UIGradient', game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat["5"]:FindFirstChild('Badge'))
-                game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat["5"]:FindFirstChild('Badge').Text.TextTruncate = 'None'
-                game:GetService("CoreGui").TopBarApp.UnibarLeftFrame.UnibarMenu["2"]["3"].chat["5"]:FindFirstChild('Badge').Text.TextColor3 = Color3.new()
-                grad.Rotation = -60
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-                })
-                table.insert(gradients, grad)
-            end
-            for i,v in topbarinstances do
-                local grad = Instance.new('UIGradient', v)
-                grad.Rotation = 60
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-                })
-                table.insert(gradients, grad)
-            end
-        else
-            pcall(function() topbarChatConnection:Disconnect() end)
-            for i,v in gradients do pcall(function() v:Destroy() end) end
-        end
-    end
+	Name = 'Cleostrap Topbars',
+	Description = 'Gives you a cool unique topbar.',
+	Default = Cleostrap.Config.customtopbar,
+	Callback = function(call)
+		Cleostrap.UpdateConfig('customtopbar', call)
+		if not fakerobloxbutton then
+			Cleostrap.error("Cleostrap Topbars isn't supported on this client version.")
+			return
+		end
+
+		local ok = pcall(function()
+			local bar = GetTopBar()
+			local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
+			local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
+			if triggerPoint then
+				triggerPoint.Visible = not call
+			end
+			fakerobloxbutton.Visible = call
+
+			local chat, chatSub = FindChatMenuFrame(bar)
+			local nineDot = FindNineDotMenuFrame(bar)
+
+			local topbarinstances = {}
+			if chat then
+				local integrationIconFrame = chat:FindFirstChild("IntegrationIconFrame")
+				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
+				if integrationIcon then table.insert(topbarinstances, integrationIcon) end
+			end
+			if nineDot then
+				local integrationIconFrame = nineDot:FindFirstChild("IntegrationIconFrame")
+				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
+				if integrationIcon then
+					local overflow = integrationIcon:FindFirstChild("Overflow")
+					local close = integrationIcon:FindFirstChild("Close")
+					if overflow then table.insert(topbarinstances, overflow) end
+					if close then table.insert(topbarinstances, close) end
+				end
+			end
+			if fakeRobloxImage then table.insert(topbarinstances, fakeRobloxImage) end
+
+			if call then
+				if chat then
+					topbarChatConnection = chat.ChildAdded:Connect(function(v)
+						local grad = Instance.new('UIGradient', v)
+						grad.Rotation = -60
+						grad.Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
+							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
+						})
+						if v:FindFirstChild("Text") then
+							v.Text.TextColor3 = Color3.new()
+							v.Text.TextTruncate = 'None'
+						end
+						table.insert(gradients, grad)
+					end)
+				end
+				if chatSub then
+					local badge = chatSub:FindFirstChild('Badge')
+					if badge then
+						local grad = Instance.new('UIGradient', badge)
+						if badge:FindFirstChild("Text") then
+							badge.Text.TextTruncate = 'None'
+							badge.Text.TextColor3 = Color3.new()
+						end
+						grad.Rotation = -60
+						grad.Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
+							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
+						})
+						table.insert(gradients, grad)
+					end
+				end
+				for _, v in topbarinstances do
+					local grad = Instance.new('UIGradient', v)
+					grad.Rotation = 60
+					grad.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
+						ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
+					})
+					table.insert(gradients, grad)
+				end
+			else
+				pcall(function() topbarChatConnection:Disconnect() end)
+				for _, v in gradients do pcall(function() v:Destroy() end) end
+				table.clear(gradients)
+			end
+		end)
+
+		if not ok then
+			Cleostrap.error("Cleostrap Topbars couldn't fully apply on this client version.")
+		end
+	end
 })
 
 local rotatinghotbar = Appearance:AddToggle({
-    Name = 'Spin Hotbar',
-    Description = 'Spins the roblox logo around for whatever reason.',
-    Default = Cleostrap.Config.RotatingHotbar,
-    Callback = function(call)
-        Cleostrap.UpdateConfig('RotatingHotbar', call)
-        if call then
-            repeat
-                game:GetService("CoreGui").TopBarApp.MenuIconHolder.TriggerPoint.Background.ScalingIcon.Rotation += 1.5
-                imagelabel.Rotation += 1.5
-                task.wait(0)
-            until not Cleostrap.Config.RotatingHotbar
-        else
-            game:GetService("CoreGui").TopBarApp.MenuIconHolder.TriggerPoint.Background.ScalingIcon.Rotation = 0
-            imagelabel.Rotation = 0
-        end
-    end
+	Name = 'Spin Hotbar',
+	Description = 'Spins the roblox logo around for whatever reason.',
+	Default = Cleostrap.Config.RotatingHotbar,
+	Callback = function(call)
+		Cleostrap.UpdateConfig('RotatingHotbar', call)
+		local bar = GetTopBar()
+		local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
+		local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
+		local background = triggerPoint and triggerPoint:FindFirstChild("Background")
+		local scalingIcon = background and background:FindFirstChild("ScalingIcon")
+
+		if not scalingIcon then
+			if call then Cleostrap.error("Spin Hotbar isn't supported on this client version.") end
+			return
+		end
+
+		if call then
+			repeat
+				scalingIcon.Rotation += 1.5
+				if fakeRobloxImage then fakeRobloxImage.Rotation += 1.5 end
+				task.wait(0)
+			until not Cleostrap.Config.RotatingHotbar
+		else
+			scalingIcon.Rotation = 0
+			if fakeRobloxImage then fakeRobloxImage.Rotation = 0 end
+		end
+	end
 })
 
-local ActivityTracking: section = Integrations:AddSection("Activity Tracking")
+local ActivityTracking: section = Integrations:AddSection({"Activity Tracking", "activity"})
+Integrations:AddButton({
+	Name = "Rejoin",
+	Description = "Rejoins the current game to fully apply all Fast Flags that require a restart.",
+	Icon = "refresh-cw",
+	Callback = function()
+		local teleportService = cloneref(game:GetService("TeleportService"))
+		local placeId = game.PlaceId
+		local jobId = game.JobId
+		local players = cloneref(game:GetService("Players"))
+		local localPlayer = players.LocalPlayer
+		if placeId and placeId ~= 0 then
+			local ok, err = pcall(function()
+				teleportService:TeleportToPlaceInstance(placeId, jobId, localPlayer)
+			end)
+			if not ok then
+				pcall(function()
+					teleportService:Teleport(placeId, localPlayer)
+				end)
+			end
+		else
+			Cleostrap.error("Can't rejoin: not in a valid game.")
+		end
+	end
+})
 
-local FFlagEditor: section = FastFlags:AddSection("Fast Flag Editor")
+Integrations:AddButton({
+	Name = "Rejoin to New Server",
+	Description = "Joins a fresh server of the current game to apply Fast Flags in a clean session.",
+	Icon = "server",
+	Callback = function()
+		local teleportService = cloneref(game:GetService("TeleportService"))
+		local placeId = game.PlaceId
+		local players = cloneref(game:GetService("Players"))
+		local localPlayer = players.LocalPlayer
+		if placeId and placeId ~= 0 then
+			pcall(function()
+				teleportService:Teleport(placeId, localPlayer)
+			end)
+		else
+			Cleostrap.error("Can't teleport: not in a valid game.")
+		end
+	end
+})
+
+local FFlagEditor: section = FastFlags:AddSection({"Fast Flag Editor", "flag"})
 local usefilepath = false
 local FFETextbox: textbox = FastFlags:AddTextBox({
     Name = "Paste Fast Flags (json)",
@@ -396,7 +620,7 @@ local FFETextbox: textbox = FastFlags:AddTextBox({
     end
 })
 
-local Presets: section = FastFlags:AddSection("Presets: Unbannable")
+local Presets: section = FastFlags:AddSection({"Presets: Unbannable", "shield-check"})
 
 local GraySky: toggle = FastFlags:AddToggle({
 Name = "Gray sky",
@@ -408,64 +632,76 @@ Callback = function(callback: boolean)
 end
 })
 
-local updatedfonts: table = {};
+local updatedfonts: table = {}
 local font: string = 'Arimo'
 local fonttdropdown: dropdown
-local uriekfqjkfjqekf = false
+local customFontEnabled = false
 local currentcustomfont = nil
 local funnycon84
 local usecustomfont: toggle
+
+-- Applies the chosen font to an instance while guarding against the
+-- PropertyChangedSignal("Font") connection re-firing itself: setting
+-- .FontFace also updates the legacy .Font property internally, which would
+-- otherwise retrigger this same connection and spam warnings/errors forever.
+local applyingFont = {}
+local function ApplyFont(inst: Instance, currfont: string)
+    if applyingFont[inst] then return end
+    applyingFont[inst] = true
+
+    if currentcustomfont then
+        inst.FontFace = currentcustomfont
+    elseif currfont and Enum.Font[currfont] then
+        inst.Font = Enum.Font[currfont]
+    end
+
+    applyingFont[inst] = false
+end
+
+local function HookFontInstance(v: Instance)
+    if updatedfonts[v] then return end -- already hooked, avoid duplicate connections
+    if not (v.ClassName == 'TextLabel' or v.ClassName == 'TextButton' or v.ClassName == 'TextBox') then return end
+
+    local ok, originalFontName = pcall(function()
+        return tostring(v.Font):split('.')[3]
+    end)
+    if not ok then return end
+
+    local entry = {inst = v, font = originalFontName}
+    entry.connection = v:GetPropertyChangedSignal('Font'):Connect(function()
+        ApplyFont(v, originalFontName)
+    end)
+    updatedfonts[v] = entry
+
+    ApplyFont(v, originalFontName)
+end
+
 local fontchanger: toggle = FastFlags:AddToggle({
     Name = 'Change Game Fonts',
     Description = 'Changes The Game font to the one you chose',
-    Callback = function(call: boolean): () -> ()
-    uriekfqjkfjqekf = call
-    Cleostrap.UpdateConfig('customfonttoggle', call);
+    Callback = function(call: boolean)
+    customFontEnabled = call
+    Cleostrap.UpdateConfig('customfonttoggle', call)
     if call then
-        print(currentcustomfont)
         funnycon84 = game.DescendantAdded:Connect(function(v)
-            if v.ClassName and (v.ClassName == 'TextLabel' or v.ClassName == 'TextButton' or v.ClassName == 'TextBox') and uriekfqjkfjqekf and font ~= nil then
-                local currfont = font
-                table.insert(updatedfonts, {inst = v, font = tostring(v.Font):split('.')[3], connection = v:GetPropertyChangedSignal('Font'):Connect(function()
-                if currentcustomfont then
-                    v.FontFace = currentcustomfont
-                else
-                    v.Font = Enum.Font[currfont]
-                end
-                end)})
-                if currentcustomfont then
-                    v.FontFace = currentcustomfont
-                else
-                    v.Font = Enum.Font[currfont]
-                end
+            if customFontEnabled then
+                pcall(HookFontInstance, v)
             end
         end)
         for i,v in game:GetDescendants() do
-            if v.ClassName and (v.ClassName == 'TextLabel' or v.ClassName == 'TextButton' or v.ClassName == 'TextBox') and font ~= nil then
-                local currfont = font
-                pcall(function() table.insert(updatedfonts, {inst = v, font = tostring(v.Font):split('.')[3], connection = v:GetPropertyChangedSignal('Font'):Connect(function()
-                    if currentcustomfont then
-                        v.FontFace = currentcustomfont
-                    else
-                        v.Font = Enum.Font[currfont]
-                    end
-                end)}) end)
-                if currentcustomfont then
-                    v.FontFace = currentcustomfont
-                else
-                    v.Font = Enum.Font[currfont]
-                end
-            end;
+            pcall(HookFontInstance, v)
         end
     else
-            pcall(function() funnycon84:Disconnect() end)
-            for i,v in updatedfonts do
-                v.connection:Disconnect()
-                v.connection = nil
-                v.inst.Font = Enum.Font[v.font]
-            end;
-            table.clear(updatedfonts);
+        pcall(function() funnycon84:Disconnect() end)
+        for inst, entry in updatedfonts do
+            pcall(function()
+                entry.connection:Disconnect()
+                entry.connection = nil
+                inst.Font = Enum.Font[entry.font]
+            end)
         end
+        table.clear(updatedfonts)
+    end
     end
 })
 local list: table = {}
@@ -494,11 +730,11 @@ usecustomfont = FastFlags:AddDropdown({
     Description = 'All fonts that are inside "Cleostrap/Main/Fonts" folder.',
     Default = Cleostrap.Config.CustomFont,
     Callback = function(val)
-        local json = val:gsub('.ttf', '.json')
-        if val == 'none' then
+        if type(val) ~= "string" or val == 'none' or val:gsub(" ", ""):len() == 0 then
             currentcustomfont = nil
             return Cleostrap.UpdateConfig('CustomFont', '')
         end
+        local json = val:gsub('.ttf', '.json')
         Cleostrap.UpdateConfig('CustomFont', val)
         writefile(json, HttpService:JSONEncode({name = 'font', faces = {
             {
@@ -518,7 +754,7 @@ usecustomfont = FastFlags:AddDropdown({
 
 fontchanger:Toggle(Cleostrap.Config.customfonttoggle)
 
-local Presets: section = FastFlags:AddSection("Presets: Bannable")
+local Presets: section = FastFlags:AddSection({"Presets: Bannable", "shield-alert"})
 
 local Desync: toggle = FastFlags:AddToggle({
     Name = "Desync",
@@ -571,7 +807,7 @@ local HitregFix: toggle = FastFlags:AddToggle({
     end
 })
 
-local Presets: section = EngineSettings:AddSection("Presets")
+local Presets: section = EngineSettings:AddSection({"Presets", "settings-2"})
 
 local deathsoundConnection;
 local enabled
@@ -629,20 +865,20 @@ lplr.CharacterAdded:Connect(function()
     game:GetService("Players").LocalPlayer.PlayerScripts.RbxCharacterSounds.Enabled = true
 end)
 
-local defaultMSAA = 0
+local defaultMSAA = tonumber(Cleostrap.GetFFlag("FIntDebugForceMSAASamples")) or 0
 local AntiAliasingQuality: dropdown = EngineSettings:AddDropdown({
     Name = "Anti-aliasing quality (MSAA)",
-    Description = "",
+    Description = "Does not apply on mobile.",
     Options = {"Automatic", "1x", "2x", "4x"},
     Default = Cleostrap.Config.AntiAliasingQuality,
     Callback = function(msaa: string)
-        if not UserInputService.TouchEnabled then return end
+        if UserInputService.TouchEnabled then return end
         Cleostrap.UpdateConfig("AntiAliasingQuality", msaa)
         Cleostrap.ToggleFFlag("FIntDebugForceMSAASamples", msaa:find("x") and msaa:gsub("x", "") or defaultMSAA)
     end
 })
 
-local shadowIntense = 1
+local shadowIntense = tonumber(Cleostrap.GetFFlag("FIntRenderShadowIntensity")) or 1
 local DisablePlayerShadows: toggle = EngineSettings:AddToggle({
     Name = "Disable player shadows",
     Description = "",
@@ -653,7 +889,7 @@ local DisablePlayerShadows: toggle = EngineSettings:AddToggle({
     end
 })
 
-local disableppfx = false
+local disableppfx = Cleostrap.GetFFlag("FFlagDisablePostFx") or false
 local DisablePostFX: toggle = EngineSettings:AddToggle({
     Name = "Disable post-processing effects",
     Description = "",
@@ -664,7 +900,7 @@ local DisablePostFX: toggle = EngineSettings:AddToggle({
     end
 })
 
-local disableterraintex = Cleostrap.GetFFlag("FIntTerrainArraySliceSize")
+local disableterraintex = tonumber(Cleostrap.GetFFlag("FIntTerrainArraySliceSize")) or 3
 local DisableTerrainTextures: toggle = EngineSettings:AddToggle({
     Name = "Disable terrain textures",
     Description = "",
@@ -675,7 +911,7 @@ local DisableTerrainTextures: toggle = EngineSettings:AddToggle({
     end
 })
 
-local origValue = Cleostrap.GetFFlag("DFIntTaskSchedulerTargetFps")
+local origValue = tonumber(Cleostrap.GetFFlag("DFIntTaskSchedulerTargetFps")) or 60
 local FramerateLimit: textbox = EngineSettings:AddTextBox({
     Name = "Framerate limit",
     Description = "Set to 0 if you want to use Roblox's native framerate unlocker.",
@@ -706,27 +942,23 @@ EngineSettings:AddToggle({
 local function changeLighting(lighting: string)
     sethiddenproperty(game.Lighting, "Technology", lighting:find("Voxel") and "Voxel" or lighting:find("Shadow Map") and "ShadowMap" or "Future")
     if not UserInputService.TouchEnabled then
-        str = lighting:lower()
+        local str = lighting:lower()
         if str:find("voxel") then
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", true)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
-        return
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", true)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
         elseif str:find("shadow map") then
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", true)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
-        return
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", true)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
         elseif str:find("future") then
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", true)
-        return
-        elseif str:find("chosen") then
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
-        Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
-        return
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", true)
+        else
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceTechnologyVoxel", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase2", false)
+            Cleostrap.ToggleFFlag("DFFlagDebugRenderForceFutureIsBrightPhase3", false)
         end
     end
 end
@@ -742,39 +974,34 @@ local PreferredLightingTechnology: dropdown = EngineSettings:AddDropdown({
     end
 })
 
-local textureQual = 3
+local textureQual = tonumber(Cleostrap.GetFFlag("DFIntTextureQualityOverride")) or 3
 local function changeTextureQuality(level: string)
-    str = level:lower()
-    if str:find("lowest") then
+    local str = level:lower()
+    if str:find("automatic") then
+        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", false)
+        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", textureQual)
+        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
+    elseif str:find("lowest") then
         Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
         Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 0)
         Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 2)
-        return
-    elseif str:find("low") then
-        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
-        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 0)
-        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
-        return
-    elseif str:find("medium") then
-        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
-        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 1)
-        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
-        return
-    elseif str:find("high") then
-        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
-        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 2)
-        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
-        return
     elseif str:find("highest") then
         Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
         Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 3)
         Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
-        return
+    elseif str:find("high") then
+        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
+        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 2)
+        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
+    elseif str:find("medium") then
+        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
+        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 1)
+        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
+    elseif str:find("low") then
+        Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", true)
+        Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", 0)
+        Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
     end
-    Cleostrap.ToggleFFlag("DFFlagTextureQualityOverrideEnabled", false)
-    Cleostrap.ToggleFFlag("DFIntTextureQualityOverride", textureQual)
-    Cleostrap.ToggleFFlag("FIntDebugTextureManagerSkipMips", 0)
-    return
 end
 
 local TextureQuality: dropdown = EngineSettings:AddDropdown({
@@ -789,37 +1016,59 @@ local TextureQuality: dropdown = EngineSettings:AddDropdown({
 })
 
 Cleostrap.canUpdate = true
-pcall(function()
-local button = Instance.new('TextButton', game:GetService('CoreGui').TopBarApp.UnibarLeftFrame)
-button.BorderSizePixel = 0
-button.BackgroundTransparency = 0.07
-button.Text = ''
-button.BackgroundColor3 = Color3.new()
-button.Size = UDim2.new(0, 44, 0, 44)
-button.Position = UDim2.new(0, 103, 0, 0)
+do
+	local button
+	local grad
 
-local imagelabel = Instance.new('ImageLabel', button)
-imagelabel.Size = UDim2.new(0, 22, 0, 22)
-imagelabel.Position = UDim2.new(0.25, 0, 0.25, 0)
-imagelabel.BackgroundTransparency = 1
-imagelabel.Image = getcustomasset('Cleostrap/icon.png')
-imagelabel.ImageColor3 = Color3.new(1, 1, 1)
+	local ok = pcall(function()
+		local bar = GetTopBar()
+		local unibarLeft = bar and bar:FindFirstChild("UnibarLeftFrame")
+		if not unibarLeft then error("UnibarLeftFrame not found") end
 
-local grad = Instance.new('UIGradient', imagelabel)
-grad.Rotation = 60
-grad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-})
-grad.Enabled = game:GetService('CoreGui')["Cleostrap Library"].Enabled
+		button = Instance.new('TextButton', unibarLeft)
+		button.BorderSizePixel = 0
+		button.BackgroundTransparency = 0.07
+		button.Text = ''
+		button.BackgroundColor3 = Color3.new()
+		button.Size = UDim2.new(0, 44, 0, 44)
+		button.Position = UDim2.new(0, 103, 0, 0)
 
-Instance.new('UICorner', button).CornerRadius = UDim.new(1, 0)
-Cleostrap.Visible = function(callback)
-    button.Visible = callback
+		local toggleImage = Instance.new('ImageLabel', button)
+		toggleImage.Size = UDim2.new(0, 22, 0, 22)
+		toggleImage.Position = UDim2.new(0.25, 0, 0.25, 0)
+		toggleImage.BackgroundTransparency = 1
+		toggleImage.Image = getcustomasset('Cleostrap/icon.png')
+		toggleImage.ImageColor3 = Color3.new(1, 1, 1)
+
+		grad = Instance.new('UIGradient', toggleImage)
+		grad.Rotation = 60
+		grad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
+		})
+		grad.Enabled = game:GetService('CoreGui')["Cleostrap Library"].Enabled
+
+		Instance.new('UICorner', button).CornerRadius = UDim.new(1, 0)
+		button.MouseButton1Click:Connect(function()
+			game:GetService('CoreGui')["Cleostrap Library"].Enabled = not grad.Enabled
+			grad.Enabled = not grad.Enabled
+		end)
+	end)
+
+	-- Cleostrap.Visible must always exist, even if the topbar icon couldn't be
+	-- created on this client version, otherwise Initiate.lua's call to it errors
+	-- and the whole GUI never opens.
+	if ok and button then
+		Cleostrap.Visible = function(callback)
+			button.Visible = callback
+			game:GetService('CoreGui')["Cleostrap Library"].Enabled = callback
+		end
+	else
+		Cleostrap.error("Couldn't add the topbar icon on this client version. Use the keybind/menu to toggle the GUI instead.")
+		Cleostrap.Visible = function(callback)
+			game:GetService('CoreGui')["Cleostrap Library"].Enabled = callback
+		end
+	end
 end
-button.MouseButton1Click:Connect(function()
-    game:GetService('CoreGui')["Cleostrap Library"].Enabled = not grad.Enabled
-    grad.Enabled = not grad.Enabled
-end) end)
 end
 return Cleostrap
