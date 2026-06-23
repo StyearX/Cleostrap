@@ -68,7 +68,67 @@ local cleolib = {
 			["Color Theme"] = Color3.fromRGB(150, 0, 255),
 			["Color Text"] = Color3.fromRGB(240, 240, 240),
 			["Color Dark Text"] = Color3.fromRGB(180, 180, 180)
-		}
+		},
+		Midnight = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 10, 18)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(15, 15, 26)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 18))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(14, 14, 22),
+			["Color Stroke"] = Color3.fromRGB(30, 30, 50),
+			["Color Theme"] = Color3.fromRGB(100, 120, 255),
+			["Color Text"] = Color3.fromRGB(220, 225, 255),
+			["Color Dark Text"] = Color3.fromRGB(140, 145, 190)
+		},
+		Rose = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(30, 20, 25)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(38, 26, 32)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(30, 20, 25))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(35, 23, 29),
+			["Color Stroke"] = Color3.fromRGB(60, 35, 45),
+			["Color Theme"] = Color3.fromRGB(230, 80, 120),
+			["Color Text"] = Color3.fromRGB(255, 235, 240),
+			["Color Dark Text"] = Color3.fromRGB(200, 160, 175)
+		},
+		Forest = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(15, 25, 18)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(20, 32, 23)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(15, 25, 18))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(18, 28, 21),
+			["Color Stroke"] = Color3.fromRGB(30, 50, 35),
+			["Color Theme"] = Color3.fromRGB(60, 200, 100),
+			["Color Text"] = Color3.fromRGB(230, 255, 235),
+			["Color Dark Text"] = Color3.fromRGB(150, 200, 160)
+		},
+		Ocean = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 20, 35)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(14, 28, 45)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 20, 35))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(12, 24, 40),
+			["Color Stroke"] = Color3.fromRGB(20, 45, 70),
+			["Color Theme"] = Color3.fromRGB(0, 180, 220),
+			["Color Text"] = Color3.fromRGB(220, 245, 255),
+			["Color Dark Text"] = Color3.fromRGB(130, 190, 215)
+		},
+		Sunset = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(30, 18, 12)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(38, 24, 16)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(30, 18, 12))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(35, 20, 14),
+			["Color Stroke"] = Color3.fromRGB(65, 38, 22),
+			["Color Theme"] = Color3.fromRGB(255, 120, 50),
+			["Color Text"] = Color3.fromRGB(255, 240, 225),
+			["Color Dark Text"] = Color3.fromRGB(210, 175, 145)
+		},
 	},
 	Info = {
 		Version = "1.1.0"
@@ -501,18 +561,18 @@ local function ButtonFrame(Instance, Title, Description, HolderSize)
 end
 
 local function GetColor(Instance)
-	if Instance:IsA("Frame") then
+	if Instance:IsA("Frame") or Instance:IsA("TextButton") or Instance:IsA("TextBox") then
 		return "BackgroundColor3"
-	elseif Instance:IsA("ImageLabel") then
+	elseif Instance:IsA("ImageLabel") or Instance:IsA("ImageButton") then
 		return "ImageColor3"
-	elseif Instance:IsA("TextLabel") then
+	elseif Instance:IsA("TextLabel") or Instance:IsA("TextButton") then
 		return "TextColor3"
 	elseif Instance:IsA("ScrollingFrame") then
 		return "ScrollBarImageColor3"
 	elseif Instance:IsA("UIStroke") then
 		return "Color"
 	end
-	return ""
+	return nil
 end
 
 function cleolib:GetIcon(index)
@@ -523,27 +583,19 @@ function cleolib:GetIcon(index)
 	local Icons = GetIconsModule()
 	if not Icons or not Icons.Loaded then return "" end
 
-	-- GetIcon() returns a plain rbxassetid:// string for flat icon packs (lucide etc.)
-	-- Icon() returns {spritesheet_id, {ImageRectSize, ImageRectPosition}} for spritesheet packs
-	-- We need a plain asset id string for ImageLabel.Image, so prefer GetIcon first.
 	local ok, result = pcall(function() return Icons.GetIcon(index) end)
 	if ok and type(result) == "string" and result:find("rbxassetid://") then
 		return result
 	end
 
-	-- Fallback: try Icon() which may return a table {sheet, rectData}
 	local ok2, result2 = pcall(function() return Icons.Icon(index) end)
 	if ok2 and type(result2) == "table" and type(result2[1]) == "string" then
-		-- Store rect data alongside the asset id using a special separator
-		-- so callers can apply ImageRectSize/Position if needed.
-		-- For simple usage (Image property only) we return just the sheet id.
 		return result2[1]
 	end
 
 	return ""
 end
 
--- Extended version that returns both image id AND rect data for spritesheet support.
 -- Returns: assetId (string), rectData (table|nil)
 function cleolib:GetIconFull(index)
 	if type(index) ~= "string" or index:gsub(" ", ""):len() == 0 then
@@ -553,11 +605,13 @@ function cleolib:GetIconFull(index)
 	local Icons = GetIconsModule()
 	if not Icons or not Icons.Loaded then return "", nil end
 
+	-- Try GetIcon first (returns plain rbxassetid:// for flat packs like lucide)
 	local ok, result = pcall(function() return Icons.GetIcon(index) end)
 	if ok and type(result) == "string" and result:find("rbxassetid://") then
 		return result, nil
 	end
 
+	-- Try Icon() which returns {sheet_id, rectData} for spritesheet packs
 	local ok2, result2 = pcall(function() return Icons.Icon(index) end)
 	if ok2 and type(result2) == "table" and type(result2[1]) == "string" then
 		return result2[1], result2[2]
@@ -568,29 +622,39 @@ end
 
 function cleolib:SetTheme(NewTheme)
 	if not VerifyTheme(NewTheme) then return end
-	
+
 	cleolib.Save.Theme = NewTheme
 	SaveJson("Cleostrap/Main/Configs/Library.json", cleolib.Save)
 	Theme = cleolib.Themes[NewTheme]
-	
+
 	Connection:FireConnection("ThemeChanged", NewTheme)
-	table.foreach(cleolib.Instances, function(_,Val)
-		if Val.Type == "Gradient" then
-			Val.Instance.Color = Theme["Color Hub 1"]
-		elseif Val.Type == "Frame" then
-			Val.Instance.BackgroundColor3 = Theme["Color Hub 2"]
-		elseif Val.Type == "Stroke" then
-			Val.Instance[GetColor(Val.Instance)] = Theme["Color Stroke"]
-		elseif Val.Type == "Theme" then
-			Val.Instance[GetColor(Val.Instance)] = Theme["Color Theme"]
-		elseif Val.Type == "Text" then
-			Val.Instance[GetColor(Val.Instance)] = Theme["Color Text"]
-		elseif Val.Type == "DarkText" then
-			Val.Instance[GetColor(Val.Instance)] = Theme["Color Dark Text"]
-		elseif Val.Type == "ScrollBar" then
-			Val.Instance[GetColor(Val.Instance)] = Theme["Color Theme"]
-		end
-	end)
+
+	for _, Val in pairs(cleolib.Instances) do
+		-- Skip instances that have been destroyed
+		if not Val.Instance or not Val.Instance.Parent then continue end
+
+		local ok, err = pcall(function()
+			if Val.Type == "Gradient" then
+				Val.Instance.Color = Theme["Color Hub 1"]
+			elseif Val.Type == "Frame" then
+				Val.Instance.BackgroundColor3 = Theme["Color Hub 2"]
+			elseif Val.Type == "Stroke" then
+				local prop = GetColor(Val.Instance)
+				if prop then Val.Instance[prop] = Theme["Color Stroke"] end
+			elseif Val.Type == "Theme" then
+				local prop = GetColor(Val.Instance)
+				if prop then Val.Instance[prop] = Theme["Color Theme"] end
+			elseif Val.Type == "Text" then
+				local prop = GetColor(Val.Instance)
+				if prop then Val.Instance[prop] = Theme["Color Text"] end
+			elseif Val.Type == "DarkText" then
+				local prop = GetColor(Val.Instance)
+				if prop then Val.Instance[prop] = Theme["Color Dark Text"] end
+			elseif Val.Type == "ScrollBar" then
+				Val.Instance.ScrollBarImageColor3 = Theme["Color Theme"]
+			end
+		end)
+	end
 end
 
 function cleolib:SetScale(NewScale)
