@@ -8,6 +8,29 @@ local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerMouse = Player:GetMouse()
 
+-- Icon pack (StyearX/Icons). Icons are pre-loaded into getgenv().CleostrapIcons
+-- by Cleostrap.start before GuiLibrary is initialized, so all MakeTab/AddSection
+-- calls resolve icons immediately without any network blocking.
+local IconsModule
+local function GetIconsModule()
+	if IconsModule then return IconsModule end
+	if getgenv and getgenv().CleostrapIcons then
+		IconsModule = getgenv().CleostrapIcons
+		return IconsModule
+	end
+	local ok, result = pcall(function()
+		return loadfile("Cleostrap/Main/Functions/Icons.lua")()()
+	end)
+	IconsModule = (ok and result and result.Loaded) and result or {
+		GetIcon      = function() return nil end,
+		Icon         = function() return nil end,
+		Icon2        = function() return nil end,
+		SetIconsType = function() end,
+		Loaded       = false
+	}
+	return IconsModule
+end
+
 local cleolib = {
 	Themes = {
 		Darker = {
@@ -493,7 +516,54 @@ local function GetColor(Instance)
 end
 
 function cleolib:GetIcon(index)
-	return ''
+	if type(index) ~= "string" or index:gsub(" ", ""):len() == 0 then
+		return ""
+	end
+
+	local Icons = GetIconsModule()
+	if not Icons or not Icons.Loaded then return "" end
+
+	-- GetIcon() returns a plain rbxassetid:// string for flat icon packs (lucide etc.)
+	-- Icon() returns {spritesheet_id, {ImageRectSize, ImageRectPosition}} for spritesheet packs
+	-- We need a plain asset id string for ImageLabel.Image, so prefer GetIcon first.
+	local ok, result = pcall(function() return Icons.GetIcon(index) end)
+	if ok and type(result) == "string" and result:find("rbxassetid://") then
+		return result
+	end
+
+	-- Fallback: try Icon() which may return a table {sheet, rectData}
+	local ok2, result2 = pcall(function() return Icons.Icon(index) end)
+	if ok2 and type(result2) == "table" and type(result2[1]) == "string" then
+		-- Store rect data alongside the asset id using a special separator
+		-- so callers can apply ImageRectSize/Position if needed.
+		-- For simple usage (Image property only) we return just the sheet id.
+		return result2[1]
+	end
+
+	return ""
+end
+
+-- Extended version that returns both image id AND rect data for spritesheet support.
+-- Returns: assetId (string), rectData (table|nil)
+function cleolib:GetIconFull(index)
+	if type(index) ~= "string" or index:gsub(" ", ""):len() == 0 then
+		return "", nil
+	end
+
+	local Icons = GetIconsModule()
+	if not Icons or not Icons.Loaded then return "", nil end
+
+	local ok, result = pcall(function() return Icons.GetIcon(index) end)
+	if ok and type(result) == "string" and result:find("rbxassetid://") then
+		return result, nil
+	end
+
+	local ok2, result2 = pcall(function() return Icons.Icon(index) end)
+	if ok2 and type(result2) == "table" and type(result2[1]) == "string" then
+		return result2[1], result2[2]
+	end
+
+	return "", nil
 end
 
 function cleolib:SetTheme(NewTheme)
@@ -901,19 +971,20 @@ function cleolib:MakeWindow(Configs)
 		if type(paste) == "table" then Configs = paste end
 		local TName = Configs[1] or Configs.Title or "Tab!"
 		local TIcon = Configs[2] or Configs.Icon or ""
-		
-		TIcon = cleolib:GetIcon(TIcon)
-		if not TIcon:find("rbxassetid://") or TIcon:gsub("rbxassetid://", ""):len() < 6 then
-			TIcon = false
-		end
-		
+
+		local iconAsset, iconRect = cleolib:GetIconFull(TIcon)
+		local hasIcon = type(iconAsset) == "string" and iconAsset:find("rbxassetid://") and iconAsset:gsub("rbxassetid://", ""):len() >= 6
+		if not hasIcon then iconAsset = ""; iconRect = nil end
+
+		local iconOffset = hasIcon and 25 or 15
+
 		local TabSelect = Make("Button", MainScroll, {
 			Size = UDim2.new(1, 0, 0, 24)
 		})Make("Corner", TabSelect)
-		
+
 		local LabelTitle = InsertTheme(Create("TextLabel", TabSelect, {
-			Size = UDim2.new(1, TIcon and -25 or -15, 1),
-			Position = UDim2.fromOffset(TIcon and 25 or 15),
+			Size = UDim2.new(1, -iconOffset, 1),
+			Position = UDim2.fromOffset(iconOffset),
 			BackgroundTransparency = 1,
 			Font = Enum.Font.GothamMedium,
 			Text = TName,
@@ -923,14 +994,18 @@ function cleolib:MakeWindow(Configs)
 			TextTransparency = (FirstTab and 0.3) or 0,
 			TextTruncate = "AtEnd"
 		}), "Text")
-		
+
 		local LabelIcon = InsertTheme(Create("ImageLabel", TabSelect, {
 			Position = UDim2.new(0, 8, 0.5),
 			Size = UDim2.new(0, 13, 0, 13),
 			AnchorPoint = Vector2.new(0, 0.5),
-			Image = TIcon or "",
+			Image = iconAsset,
+			ImageRectSize = (iconRect and iconRect.ImageRectSize) or Vector2.new(0, 0),
+			ImageRectOffset = (iconRect and iconRect.ImageRectPosition) or Vector2.new(0, 0),
+			Visible = hasIcon,
 			BackgroundTransparency = 1,
-			ImageTransparency = (FirstTab and 0.3) or 0
+			ImageTransparency = (FirstTab and 0.3) or 0,
+			ImageColor3 = Theme["Color Text"]
 		}), "Text")
 		
 		local Selected = InsertTheme(Create("Frame", TabSelect, {
@@ -1014,27 +1089,54 @@ function cleolib:MakeWindow(Configs)
 		
 		function Tab:AddSection(Configs)
 			local SectionName = type(Configs) == "string" and Configs or Configs[1] or Configs.Name or Configs.Title or Configs.Section
-			
+			local SIcon = type(Configs) == "table" and (Configs[2] or Configs.Icon) or ""
+
+			local sIconAsset, sIconRect = cleolib:GetIconFull(SIcon)
+			local hasSIcon = type(sIconAsset) == "string" and sIconAsset:find("rbxassetid://") and sIconAsset:gsub("rbxassetid://", ""):len() >= 6
+			if not hasSIcon then sIconAsset = ""; sIconRect = nil end
+
+			local iconPad = hasSIcon and 22 or 5
+
 			local SectionFrame = Create("Frame", Container, {
-				Size = UDim2.new(1, 0, 0, 20),
+				Size = UDim2.new(1, 0, 0, 24),
 				BackgroundTransparency = 1,
 				Name = "Option"
 			})
-			
+
+			local SectionIcon = Create("ImageLabel", SectionFrame, {
+				Position = UDim2.new(0, 4, 0.5),
+				Size = UDim2.new(0, 14, 0, 14),
+				AnchorPoint = Vector2.new(0, 0.5),
+				Image = sIconAsset,
+				ImageRectSize = (sIconRect and sIconRect.ImageRectSize) or Vector2.new(0, 0),
+				ImageRectOffset = (sIconRect and sIconRect.ImageRectPosition) or Vector2.new(0, 0),
+				Visible = hasSIcon,
+				BackgroundTransparency = 1,
+				ImageColor3 = Theme["Color Text"]
+			})
+
 			local SectionLabel = InsertTheme(Create("TextLabel", SectionFrame, {
 				Font = Enum.Font.GothamBold,
 				Text = SectionName,
 				TextColor3 = Theme["Color Text"],
-				Size = UDim2.new(1, -25, 1, 0),
-				Position = UDim2.new(0, 5),
+				Size = UDim2.new(1, -(iconPad + 10), 1, 0),
+				Position = UDim2.new(0, iconPad),
 				BackgroundTransparency = 1,
 				TextTruncate = "AtEnd",
-				TextSize = 14,
+				TextSize = 12,
 				TextXAlignment = "Left"
 			}), "Text")
-			
+
 			local Section = {}
 			table.insert(cleolib.Options, {type = "Section", Name = SectionName, func = Section})
+
+			Connection["ThemeChanged"]:Connect(function(NewTheme)
+				local t = cleolib.Themes[NewTheme]
+				if t and SectionIcon then
+					SectionIcon.ImageColor3 = t["Color Text"]
+				end
+			end)
+
 			function Section:Visible(Bool)
 				if Bool == nil then SectionFrame.Visible = not SectionFrame.Visible return end
 				SectionFrame.Visible = Bool
@@ -1043,8 +1145,22 @@ function cleolib:MakeWindow(Configs)
 				SectionFrame:Destroy()
 			end
 			function Section:Set(New)
-				if New then
-					SectionLabel.Text = GetStr(New)
+				if New then SectionLabel.Text = GetStr(New) end
+			end
+			function Section:SetIcon(NewIcon)
+				local asset, rect = cleolib:GetIconFull(NewIcon)
+				local valid = type(asset) == "string" and asset:find("rbxassetid://") and asset:gsub("rbxassetid://", ""):len() >= 6
+				if valid then
+					SectionIcon.Image = asset
+					SectionIcon.ImageRectSize = (rect and rect.ImageRectSize) or Vector2.new(0, 0)
+					SectionIcon.ImageRectOffset = (rect and rect.ImageRectPosition) or Vector2.new(0, 0)
+					SectionIcon.Visible = true
+					SectionLabel.Size = UDim2.new(1, -32, 1, 0)
+					SectionLabel.Position = UDim2.new(0, 22, 0, 0)
+				else
+					SectionIcon.Visible = false
+					SectionLabel.Size = UDim2.new(1, -15, 1, 0)
+					SectionLabel.Position = UDim2.new(0, 5, 0, 0)
 				end
 			end
 			return Section
@@ -1077,16 +1193,23 @@ function cleolib:MakeWindow(Configs)
 		function Tab:AddButton(Configs)
 			local BName = Configs[1] or Configs.Name or Configs.Title or "Button!"
 			local BDescription = Configs.Desc or Configs.Description or ""
+			local BIcon = Configs.Icon or ""
 			local Callback = Funcs:GetCallback(Configs, 2)
-			
+
 			local FButton, LabelFunc = ButtonFrame(Container, BName, BDescription, UDim2.new(1, -20))
-			
+
+			local resolvedAsset, resolvedRect = cleolib:GetIconFull(BIcon)
+			local hasButtonIcon = type(resolvedAsset) == "string" and resolvedAsset:find("rbxassetid://") and resolvedAsset:gsub("rbxassetid://", ""):len() >= 6
+
 			local ButtonIcon = Create("ImageLabel", FButton, {
 				Size = UDim2.new(0, 14, 0, 14),
 				Position = UDim2.new(1, -10, 0.5),
 				AnchorPoint = Vector2.new(1, 0.5),
 				BackgroundTransparency = 1,
-				Image = "rbxassetid://10709791437"
+				Image = hasButtonIcon and resolvedAsset or "rbxassetid://10709791437",
+				ImageRectSize = (hasButtonIcon and resolvedRect and resolvedRect.ImageRectSize) or Vector2.new(0, 0),
+				ImageRectOffset = (hasButtonIcon and resolvedRect and resolvedRect.ImageRectPosition) or Vector2.new(0, 0),
+				ImageColor3 = Theme["Color Text"]
 			})
 			
 			FButton.Activated:Connect(function()
