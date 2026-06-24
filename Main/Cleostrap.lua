@@ -36,13 +36,14 @@ Cleostrap.Config = setmetatable({
 	PerformanceBoost = false,
 	DisableAds = false,
 	DisableTelemetry = false,
-	DisableWind = false,
-	RemoveGrass = false,
-	InfiniteZoom = false,
-	DisableDynamicHeads = false,
-	DisableBlur = false,
-	NoInternetDisconnect = false,
-	DisableBubbleChat = false,
+	RenderingApi = "Default",
+	BypassFpsCap = false,
+	NoTextures = false,
+	SmootherTerrain = false,
+	LowTerrainTextures = false,
+	LowGfxQuality = false,
+	LowRenderDistance = false,
+	LowerTextureQuality = false,
 	customfonttoggle = false,
 	customfontroblox = "",
 	customtopbar = false,
@@ -1088,79 +1089,118 @@ local TextureQuality: dropdown = EngineSettings:AddDropdown({
     end
 })
 
-EngineSettings:AddSection({"Extras", "sparkles"})
+EngineSettings:AddSection({"Rendering API", "monitor"})
 
-local DisableWind: toggle = EngineSettings:AddToggle({
-    Name = "Disable wind",
-    Description = "Removes global wind rendering and simulation.",
-    Default = Cleostrap.Config.DisableWind,
-    Callback = function(callback)
-        Cleostrap.UpdateConfig("DisableWind", callback)
-        Cleostrap.ToggleFFlag("FFlagGlobalWindRendering", not callback)
-        Cleostrap.ToggleFFlag("FFlagGlobalWindActivated", not callback)
+local AllRenderingFlags = {
+    "FFlagDebugGraphicsPreferD3D11",
+    "FFlagDebugGraphicsPreferD3D11FL10",
+    "FFlagDebugGraphicsDisableDirect3D11",
+    "FFlagDebugGraphicsPreferOpenGL",
+    "FFlagDebugGraphicsPreferVulkan",
+    "FFlagDebugGraphicsPreferMetal",
+}
+
+local RenderingApiPresets = {
+    ["DirectX 11"] = { FFlagDebugGraphicsPreferD3D11 = "True" },
+    ["DirectX 10"] = { FFlagDebugGraphicsPreferD3D11FL10 = "True" },
+    ["OpenGL"]     = { FFlagDebugGraphicsDisableDirect3D11 = "True", FFlagDebugGraphicsPreferOpenGL = "True" },
+    ["Vulkan"]     = { FFlagDebugGraphicsDisableDirect3D11 = "True", FFlagDebugGraphicsPreferVulkan = "True" },
+    ["Metal"]      = { FFlagDebugGraphicsPreferMetal = "True" },
+}
+
+local RenderingApi: dropdown = EngineSettings:AddDropdown({
+    Name = "Rendering API",
+    Description = "Forces a specific graphics API. Requires rejoin to take effect.",
+    Options = {"Default", "DirectX 11", "DirectX 10", "OpenGL", "Vulkan", "Metal"},
+    Default = Cleostrap.Config.RenderingApi,
+    Callback = function(api)
+        Cleostrap.UpdateConfig("RenderingApi", api)
+        for _, flag in AllRenderingFlags do
+            Cleostrap.ToggleFFlag(flag, false)
+        end
+        local preset = RenderingApiPresets[api]
+        if preset then
+            for flag, val in preset do
+                Cleostrap.ToggleFFlag(flag, val)
+            end
+        end
     end
 })
 
-local RemoveGrass: toggle = EngineSettings:AddToggle({
-    Name = "Remove grass",
-    Description = "Eliminates terrain grass for cleaner visuals and a small performance gain.",
-    Default = Cleostrap.Config.RemoveGrass,
+EngineSettings:AddSection({"Graphics", "image"})
+
+local BypassFpsCap: toggle = EngineSettings:AddToggle({
+    Name = "Bypass FPS cap",
+    Description = "Sets the scheduler target to 9999 to remove the FPS ceiling.",
+    Default = Cleostrap.Config.BypassFpsCap,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("RemoveGrass", callback)
-        Cleostrap.ToggleFFlag("FIntFRMMinGrassDistance",     callback and 0 or 125)
-        Cleostrap.ToggleFFlag("FIntFRMMaxGrassDistance",     callback and 0 or 2000)
-        Cleostrap.ToggleFFlag("FIntRenderGrassDetailStrands", callback and 0 or 32)
-        Cleostrap.ToggleFFlag("FIntRenderGrassHeightScaler", callback and 0 or 1)
+        Cleostrap.UpdateConfig("BypassFpsCap", callback)
+        Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", callback and 9999 or origValue)
     end
 })
 
-local InfiniteZoom: toggle = EngineSettings:AddToggle({
-    Name = "Infinite zoom",
-    Description = "Removes the camera max zoom limit.",
-    Default = Cleostrap.Config.InfiniteZoom,
+local NoTextures: toggle = EngineSettings:AddToggle({
+    Name = "No textures",
+    Description = "Strips all part and terrain textures. Rejoin to restore.",
+    Default = Cleostrap.Config.NoTextures,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("InfiniteZoom", callback)
-        Cleostrap.ToggleFFlag("FIntCameraMaxZoomDistance", callback and 9999 or 400)
+        Cleostrap.UpdateConfig("NoTextures", callback)
+        if callback then
+            Cleostrap.ToggleFFlag("FStringPartTexturePackTable2022",    "{\"glass\":{\"ids\":[\"rbxassetid://9873284556\",\"rbxassetid://9438453972\"],\"color\":[254,254,254,7]}}")
+            Cleostrap.ToggleFFlag("FStringPartTexturePackTablePre2022", "{\"glass\":{\"ids\":[\"rbxassetid://7547304948\",\"rbxassetid://7546645118\"],\"color\":[254,254,254,7]}}")
+            Cleostrap.ToggleFFlag("FStringTerrainMaterialTable2022",    "")
+            Cleostrap.ToggleFFlag("FStringTerrainMaterialTablePre2022", "")
+        end
     end
 })
 
-local DisableDynamicHeads: toggle = EngineSettings:AddToggle({
-    Name = "Disable dynamic heads",
-    Description = "Disables animated facial expressions on avatars.",
-    Default = Cleostrap.Config.DisableDynamicHeads,
+local SmootherTerrain: toggle = EngineSettings:AddToggle({
+    Name = "Smoother terrain",
+    Description = "Forces deterministic rendering for smoother terrain geometry.",
+    Default = Cleostrap.Config.SmootherTerrain,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("DisableDynamicHeads", callback)
-        Cleostrap.ToggleFFlag("DFFlagEnableDynamicHeadByDefault", not callback)
+        Cleostrap.UpdateConfig("SmootherTerrain", callback)
+        Cleostrap.ToggleFFlag("FFlagDebugRenderingSetDeterministic", callback)
     end
 })
 
-local DisableBlur: toggle = EngineSettings:AddToggle({
-    Name = "Remove disconnect blur",
-    Description = "Removes the blur overlay on the disconnect and loading screens.",
-    Default = Cleostrap.Config.DisableBlur,
+local LowTerrainTextures: toggle = EngineSettings:AddToggle({
+    Name = "Low quality terrain textures",
+    Description = "Forces terrain texture slice size to its lowest non-zero value.",
+    Default = Cleostrap.Config.LowTerrainTextures,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("DisableBlur", callback)
-        Cleostrap.ToggleFFlag("FIntRobloxGuiBlurIntensity", callback and 0 or 24)
+        Cleostrap.UpdateConfig("LowTerrainTextures", callback)
+        Cleostrap.ToggleFFlag("FIntTerrainArraySliceSize", callback and 4 or 6)
     end
 })
 
-local DisableBubbleChat: toggle = EngineSettings:AddToggle({
-    Name = "Disable bubble chat",
-    Description = "Hides chat bubbles above player heads.",
-    Default = Cleostrap.Config.DisableBubbleChat,
+local LowGfxQuality: toggle = EngineSettings:AddToggle({
+    Name = "Low graphics quality",
+    Description = "Forces FRM quality level to 1 for maximum performance.",
+    Default = Cleostrap.Config.LowGfxQuality,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("DisableBubbleChat", callback)
-        Cleostrap.ToggleFFlag("FFlagEnableBubbleChatFromChatService", not callback)
+        Cleostrap.UpdateConfig("LowGfxQuality", callback)
+        Cleostrap.ToggleFFlag("DFIntDebugFRMQualityLevelOverride", callback and 1 or 0)
     end
 })
 
-local NoInternetDisconnect: toggle = EngineSettings:AddToggle({
-    Name = "No internet disconnect",
-    Description = "Hides the disconnection message when internet drops. You will still be kicked.",
-    Default = Cleostrap.Config.NoInternetDisconnect,
+local LowRenderDistance: toggle = EngineSettings:AddToggle({
+    Name = "Low render distance",
+    Description = "Reduces the GC culling distance for improved performance at the cost of pop-in.",
+    Default = Cleostrap.Config.LowRenderDistance,
     Callback = function(callback)
-        Cleostrap.UpdateConfig("NoInternetDisconnect", callback)
-        Cleostrap.ToggleFFlag("DFFlagDebugDisableTimeoutDisconnect", callback)
+        Cleostrap.UpdateConfig("LowRenderDistance", callback)
+        Cleostrap.ToggleFFlag("DFIntDebugRestrictGCDistance", callback and 1 or 0)
+    end
+})
+
+local LowerTextureQuality: toggle = EngineSettings:AddToggle({
+    Name = "Lower texture quality utility",
+    Description = "Applies a negative performance utility bias to force the lowest texture quality tier.",
+    Default = Cleostrap.Config.LowerTextureQuality,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("LowerTextureQuality", callback)
+        Cleostrap.ToggleFFlag("DFIntPerformanceControlTextureQualityBestUtility", callback and -1 or 0)
     end
 })
 
