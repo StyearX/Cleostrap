@@ -35,6 +35,29 @@ if not isfile("Cleostrap/Main/Cleostrap.lua") then
 	install()
 end
 
-local Cleostrap = loadfile("Cleostrap/Main/Cleostrap.lua")()
-Cleostrap.start()
-Cleostrap.Visible(not hideui)
+local function loadCleostrap()
+    local success, result = pcall(function()
+        return loadfile("Cleostrap/Main/Cleostrap.lua")()
+    end)
+    if not success or type(result) ~= "table" then
+        return nil
+    end
+    return result
+end
+
+local Cleostrap = loadCleostrap()
+
+if not Cleostrap then
+    if isfile("Cleostrap/Main/Cleostrap.lua") then
+        delfile("Cleostrap/Main/Cleostrap.lua")
+    end
+    install()
+    Cleostrap = loadCleostrap()
+end
+
+if type(Cleostrap) == "table" then
+    Cleostrap.start()
+    Cleostrap.Visible(not hideui)
+else
+    warn("Cleostrap failed to load.")
+end
