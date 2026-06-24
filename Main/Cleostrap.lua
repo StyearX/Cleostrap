@@ -48,6 +48,7 @@ Cleostrap.Config = setmetatable({
 	customfontroblox = "",
 	customtopbar = false,
 	CustomFont = "",
+	Skybox = "None",
 	CameraSensitivity = 1,
 	CrosshairImage = "",
 	TouchUiSize = 1
@@ -563,6 +564,254 @@ local rotatinghotbar = Appearance:AddToggle({
 			if fakeRobloxImage then fakeRobloxImage.Rotation = 0 end
 		end
 	end
+})
+
+local SkyboxCacheRoot = "Cleostrap/Skybox"
+if not isfolder(SkyboxCacheRoot) then makefolder(SkyboxCacheRoot) end
+
+local SkyboxPresets = {
+	["Alya"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_Alya",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NzkzMTZf/Rt.png",   File = "Rt.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NzkzMTVf/Up.png",   File = "Up.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NzkzMTJf/dn.png",   File = "Dn.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NzkzMTNf/ft.png",   File = "Ft.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NzkzMTFf/bk.png",   File = "Bk.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NzkzMTRf/if.png",   File = "Lf.png"},
+		},
+	},
+	["Alya 2"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_Alya2",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NzkzMjRf/AlyaRt.png", File = "AlyaRt.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NzkzMjVf/AlyaUp.png", File = "AlyaUp.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NzkzMjFf/alyaDn.png", File = "AlyaDn.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NzkzMjJf/AlyaFt.png", File = "AlyaFt.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NzkzMjBf/AlyaBk.png", File = "AlyaBk.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NzkzMjNf/AlyaLf.png", File = "AlyaLf.png"},
+		},
+	},
+	["Nino Nakano"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_NinoNakano",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NjQyODNf/right1.png", File = "right1.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NjQyNzhf/back.png",   File = "back.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NjQyODBf/front.png",  File = "front.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NjQyODJf/left1.png",  File = "left1.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NjQyNzlf/down.png",   File = "down.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NjQyODFf/up.png",     File = "up.png"},
+		},
+	},
+	["Nino Nakano 2"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_NinoNakano2",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NjQyNTJf/rt.png", File = "rt.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NjQyNTBf/up.png", File = "up.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NjQyNTVf/dn.png", File = "dn.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NjQyNTNf/if.png", File = "if.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NjQyNTZf/bk.png", File = "bk.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NjQyNTRf/ft.png", File = "ft.png"},
+		},
+	},
+	["Yotsuba Nakano"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_YotsubaNakano",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NzkzMzdf/YotsubaRt.png",   File = "YotsubaRt.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NzkzMzhf/YotsubaUp.png",   File = "YotsubaUp.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NzkzMzNf/YotsubaDn.png",   File = "YotsubaDn.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NzkzMzRf/YotsubaFt.png",   File = "YotsubaFt.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NzkzMzFf/YotsubaBk.png",   File = "YotsubaBk.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NzkzMzZf/YotsubaLeft.png", File = "YotsubaLeft.png"},
+		},
+	},
+	["Rias Gremory"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_RiasGremory",
+		ZeroHaze = false,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NzkyOTFf/RightRias.png",    File = "RightRias.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NzkyOTNf/leftRias.png",     File = "leftRias.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NzkyOTVf/front%20Rias.png", File = "frontRias.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NzkyOTRf/BackRias.png",     File = "BackRias.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NzkyOThf/downRias.png",     File = "downRias.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NzkyOTJf/UpRias.png",       File = "UpRias.png"},
+		},
+	},
+	["Hakari Hananozo"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_HakariHananozo",
+		ZeroHaze = false,
+		Faces = {
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NjEzMTVf/SkyBk.tex", File = "SkyBk.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/s/NjNfOTg0NjEzMTdf/SkyFt.tex", File = "SkyFt.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/s/NjNfOTg0NjEzMThf/SkyIf.tex", File = "SkyIf.png"},
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NjEzMTlf/SkyRt.tex", File = "SkyRt.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NjEzMjBf/SkyUp.tex", File = "SkyUp.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NjEzMTZf/Skydn.tex", File = "Skydn.png"},
+		},
+	},
+	["Saki Saki"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_SakiSaki",
+		ZeroHaze = true,
+		Faces = {
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NjQyNzNf/right.png",  File = "right.png"},
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NjQyNzBf/left.png",   File = "left.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NjQyNjhf/front1.png", File = "front1.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NjQyNjZf/back1.png",  File = "back1.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NjQyNjdf/down1.png",  File = "down1.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NjQyNjlf/Up1.png",    File = "Up1.png"},
+		},
+	},
+	["Xenovia Quarta"] = {
+		CacheFolder = "Cleostrap/Skybox/cs_XenoviaQuarta",
+		ZeroHaze = false,
+		Faces = {
+			{Prop = "SkyboxLf", Url = "https://od.lk/d/NjNfOTg0NjM0ODhf/if.png", File = "if.png"},
+			{Prop = "SkyboxBk", Url = "https://od.lk/d/NjNfOTg0NjM0ODlf/ft.png", File = "ft.png"},
+			{Prop = "SkyboxDn", Url = "https://od.lk/d/NjNfOTg0NjM0OTBf/dn.png", File = "dn.png"},
+			{Prop = "SkyboxFt", Url = "https://od.lk/d/NjNfOTg0NjM0OTFf/bk.png", File = "bk.png"},
+			{Prop = "SkyboxUp", Url = "https://od.lk/d/NjNfOTg0NjM0ODZf/up.png", File = "up.png"},
+			{Prop = "SkyboxRt", Url = "https://od.lk/d/NjNfOTg0NjM0ODdf/rt.png", File = "rt.png"},
+		},
+	},
+}
+
+local function ClearActiveSky()
+	local Lighting = cloneref(game:GetService("Lighting"))
+	for _, Child in Lighting:GetChildren() do
+		if Child:IsA("Sky") then Child:Destroy() end
+	end
+end
+
+local function ApplySkyPreset(PresetData)
+	ClearActiveSky()
+	if not PresetData then return end
+	local CacheDir = PresetData.CacheFolder
+	if not isfolder(CacheDir) then makefolder(CacheDir) end
+	local NewSky = Instance.new("Sky")
+	NewSky.Name = "Sky"
+	NewSky.CelestialBodiesShown = false
+	NewSky.StarCount = 0
+	for _, FaceData in PresetData.Faces do
+		local FilePath = CacheDir .. "/" .. FaceData.File
+		if not isfile(FilePath) then
+			local DownloadOk, DownloadErr = pcall(function()
+				writefile(FilePath, game:HttpGet(FaceData.Url, true))
+			end)
+			if not DownloadOk then
+				NewSky:Destroy()
+				Cleostrap.error("Skybox download failed. Check your internet or try again.")
+				return
+			end
+		end
+		local SetOk = pcall(function()
+			NewSky[FaceData.Prop] = getcustomasset(FilePath)
+		end)
+		if not SetOk then
+			NewSky:Destroy()
+			Cleostrap.error("getcustomasset failed. Your executor does not support custom skyboxes.")
+			return
+		end
+	end
+	if PresetData.ZeroHaze then
+		local Lighting = cloneref(game:GetService("Lighting"))
+		for _, Atmo in Lighting:GetChildren() do
+			if Atmo:IsA("Atmosphere") then Atmo.Haze = 0 end
+		end
+	end
+	NewSky.Parent = cloneref(game:GetService("Lighting"))
+end
+
+local CustomFaceNames = {"ft.png", "bk.png", "lf.png", "rt.png", "up.png", "dn.png"}
+local CustomFaceProps  = {"SkyboxFt", "SkyboxBk", "SkyboxLf", "SkyboxRt", "SkyboxUp", "SkyboxDn"}
+
+local function ApplyCustomSkybox(FolderPath)
+	ClearActiveSky()
+	local NewSky = Instance.new("Sky")
+	NewSky.Name = "Sky"
+	NewSky.CelestialBodiesShown = false
+	NewSky.StarCount = 0
+	local Missing = {}
+	for i, FileName in CustomFaceNames do
+		local FilePath = FolderPath .. "/" .. FileName
+		if not isfile(FilePath) then
+			table.insert(Missing, FileName)
+		else
+			pcall(function()
+				NewSky[CustomFaceProps[i]] = getcustomasset(FilePath)
+			end)
+		end
+	end
+	if #Missing > 0 then
+		NewSky:Destroy()
+		Cleostrap.error("Custom skybox missing: " .. table.concat(Missing, ", "))
+		return
+	end
+	NewSky.Parent = cloneref(game:GetService("Lighting"))
+end
+
+local PresetOrder = {
+	"None",
+	"Alya", "Alya 2",
+	"Nino Nakano", "Nino Nakano 2",
+	"Yotsuba Nakano",
+	"Rias Gremory",
+	"Hakari Hananozo",
+	"Saki Saki",
+	"Xenovia Quarta",
+}
+
+local IsBuiltinPreset = {}
+for _, Name in PresetOrder do IsBuiltinPreset[Name] = true end
+
+local AllSkyboxOptions = {table.unpack(PresetOrder)}
+local CustomSkyboxPaths = {}
+
+pcall(function()
+	local Entries = listfiles(SkyboxCacheRoot)
+	if type(Entries) ~= "table" then return end
+	for _, EntryPath in Entries do
+		local FolderName = EntryPath:match("[/\\]([^/\\]+)$")
+		if FolderName and not IsBuiltinPreset[FolderName] then
+			local AllPresent = true
+			for _, FaceFile in CustomFaceNames do
+				if not isfile(EntryPath .. "/" .. FaceFile) then
+					AllPresent = false
+					break
+				end
+			end
+			if AllPresent then
+				local Label = "[Custom] " .. FolderName
+				table.insert(AllSkyboxOptions, Label)
+				CustomSkyboxPaths[Label] = EntryPath
+			end
+		end
+	end
+end)
+
+Appearance:AddSection({"Skybox", "image"})
+Appearance:AddDropdown({
+	Name = "Skybox changer",
+	Description = "Requires getcustomasset, writefile and makefolder support. Textures download once and are cached under Cleostrap/Skybox/. To add your own skybox: create a folder inside Cleostrap/Skybox/ (e.g. Cleostrap/Skybox/MySkybox/) and place exactly 6 PNG files inside: ft.png (front), bk.png (back), lf.png (left), rt.png (right), up.png (top), dn.png (bottom). Then reopen Cleostrap and it will appear in this dropdown under [Custom].",
+	Options = AllSkyboxOptions,
+	Default = Cleostrap.Config.Skybox or "None",
+	Callback = function(Selected)
+		Cleostrap.UpdateConfig("Skybox", Selected)
+		if Selected == "None" then
+			ClearActiveSky()
+		elseif CustomSkyboxPaths[Selected] then
+			task.spawn(ApplyCustomSkybox, CustomSkyboxPaths[Selected])
+		else
+			local Preset = SkyboxPresets[Selected]
+			if Preset then
+				task.spawn(ApplySkyPreset, Preset)
+			end
+		end
+	end,
 })
 
 local ActivityTracking: section = Integrations:AddSection({"Activity Tracking", "activity"})
@@ -1110,7 +1359,7 @@ local RenderingApiPresets = {
 
 local RenderingApi: dropdown = EngineSettings:AddDropdown({
     Name = "Rendering API",
-    Description = "Forces a specific graphics API. Requires rejoin to take effect.",
+    Description = "Forces your default rendering API to the one you choose. The selected API may not work on your device — compatibility depends entirely on whether your hardware supports it. Requires rejoin to take effect.",
     Options = {"Default", "DirectX 11", "DirectX 10", "OpenGL", "Vulkan", "Metal"},
     Default = Cleostrap.Config.RenderingApi,
     Callback = function(api)
@@ -1141,15 +1390,20 @@ local BypassFpsCap: toggle = EngineSettings:AddToggle({
 
 local NoTextures: toggle = EngineSettings:AddToggle({
     Name = "No textures",
-    Description = "Strips all part and terrain textures. Rejoin to restore.",
+    Description = "Strips all part and terrain textures. This is clientside only. WARNING: may crash the game in some experiences that depend on texture tables. Rejoin to restore.",
     Default = Cleostrap.Config.NoTextures,
     Callback = function(callback)
         Cleostrap.UpdateConfig("NoTextures", callback)
         if callback then
-            Cleostrap.ToggleFFlag("FStringPartTexturePackTable2022",    "{\"glass\":{\"ids\":[\"rbxassetid://9873284556\",\"rbxassetid://9438453972\"],\"color\":[254,254,254,7]}}")
-            Cleostrap.ToggleFFlag("FStringPartTexturePackTablePre2022", "{\"glass\":{\"ids\":[\"rbxassetid://7547304948\",\"rbxassetid://7546645118\"],\"color\":[254,254,254,7]}}")
-            Cleostrap.ToggleFFlag("FStringTerrainMaterialTable2022",    "")
-            Cleostrap.ToggleFFlag("FStringTerrainMaterialTablePre2022", "")
+            local ok = pcall(function()
+                Cleostrap.ToggleFFlag("FStringPartTexturePackTable2022",    "{\"glass\":{\"ids\":[\"rbxassetid://9873284556\",\"rbxassetid://9438453972\"],\"color\":[254,254,254,7]}}")
+                Cleostrap.ToggleFFlag("FStringPartTexturePackTablePre2022", "{\"glass\":{\"ids\":[\"rbxassetid://7547304948\",\"rbxassetid://7546645118\"],\"color\":[254,254,254,7]}}")
+                Cleostrap.ToggleFFlag("FStringTerrainMaterialTable2022",    "")
+                Cleostrap.ToggleFFlag("FStringTerrainMaterialTablePre2022", "")
+            end)
+            if not ok then
+                Cleostrap.error("No Textures failed to apply. Rejoin and try again.")
+            end
         end
     end
 })
