@@ -33,6 +33,16 @@ Cleostrap.Config = setmetatable({
 	GraySky = false,
 	Desync = false,
 	HitregFix = false,
+	PerformanceBoost = false,
+	DisableAds = false,
+	DisableTelemetry = false,
+	DisableWind = false,
+	RemoveGrass = false,
+	InfiniteZoom = false,
+	DisableDynamicHeads = false,
+	DisableBlur = false,
+	NoInternetDisconnect = false,
+	DisableBubbleChat = false,
 	customfonttoggle = false,
 	customfontroblox = "",
 	customtopbar = false,
@@ -441,19 +451,13 @@ customtopbar = Appearance:AddToggle({
 	Default = Cleostrap.Config.customtopbar,
 	Callback = function(call)
 		Cleostrap.UpdateConfig('customtopbar', call)
-		if not fakerobloxbutton then
-			Cleostrap.error("Cleostrap Topbars isn't supported on this client version.")
-			return
-		end
 
 		local ok = pcall(function()
 			local bar = GetTopBar()
 			local menuIconHolder = bar and bar:FindFirstChild("MenuIconHolder")
 			local triggerPoint = menuIconHolder and menuIconHolder:FindFirstChild("TriggerPoint")
-			if triggerPoint then
-				triggerPoint.Visible = not call
-			end
-			fakerobloxbutton.Visible = call
+			local background = triggerPoint and triggerPoint:FindFirstChild("Background")
+			local scalingIcon = background and background:FindFirstChild("ScalingIcon")
 
 			local chat, chatSub = FindChatMenuFrame(bar)
 			local nineDot = FindNineDotMenuFrame(bar)
@@ -474,7 +478,7 @@ customtopbar = Appearance:AddToggle({
 					if close then table.insert(topbarinstances, close) end
 				end
 			end
-			if fakeRobloxImage then table.insert(topbarinstances, fakeRobloxImage) end
+			if scalingIcon then table.insert(topbarinstances, scalingIcon) end
 
 			if call then
 				if chat then
@@ -623,13 +627,77 @@ local FFETextbox: textbox = FastFlags:AddTextBox({
 local Presets: section = FastFlags:AddSection({"Presets: Unbannable", "shield-check"})
 
 local GraySky: toggle = FastFlags:AddToggle({
-Name = "Gray sky",
-Description = "Turns the sky gray. (Requires rejoin)",
-Default = Cleostrap.Config.GraySky,
-Callback = function(callback: boolean)
-    Cleostrap.UpdateConfig("GraySky", callback)
-    Cleostrap.ToggleFFlag("FFlagDebugSkyGray", callback)
-end
+    Name = "Gray sky",
+    Description = "Turns the sky gray. Requires rejoin.",
+    Default = Cleostrap.Config.GraySky,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("GraySky", callback)
+        Cleostrap.ToggleFFlag("FFlagDebugSkyGray", callback)
+    end
+})
+
+local DisableAds: toggle = FastFlags:AddToggle({
+    Name = "Disable ads",
+    Description = "Removes in-experience ads from loading.",
+    Default = Cleostrap.Config.DisableAds,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableAds", callback)
+        Cleostrap.ToggleFFlag("FFlagAdServiceEnabled", not callback)
+    end
+})
+
+local DisableTelemetry: toggle = FastFlags:AddToggle({
+    Name = "Disable telemetry",
+    Description = "Reduces background data collection sent to Roblox.",
+    Default = Cleostrap.Config.DisableTelemetry,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableTelemetry", callback)
+        local TelemetryFlags = {
+            FFlagDebugDisableTelemetryEphemeralCounter = callback,
+            FFlagDebugDisableTelemetryEphemeralStat    = callback,
+            FFlagDebugDisableTelemetryEventIngest      = callback,
+            FFlagDebugDisableTelemetryPoint            = callback,
+            FFlagDebugDisableTelemetryV2Counter        = callback,
+            FFlagDebugDisableTelemetryV2Event          = callback,
+            FFlagDebugDisableTelemetryV2Stat           = callback,
+        }
+        for flagName, flagValue in TelemetryFlags do
+            Cleostrap.ToggleFFlag(flagName, flagValue)
+        end
+    end
+})
+
+local PerformanceBoost: toggle = FastFlags:AddToggle({
+    Name = "Performance boost",
+    Description = "Applies a set of flags that improve frame pacing, replication throughput and input latency. Rejoin to fully remove.",
+    Default = Cleostrap.Config.PerformanceBoost,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("PerformanceBoost", callback)
+        if not callback then return end
+        local PerfFlags = {
+            DFFlagFastEndUpdateLoop                            = "True",
+            FFlagSimEnableDCD16                                = "True",
+            DFFlagReplicatorSeparateVarThresholds              = "True",
+            FFlagFasterPreciseTime4                            = "True",
+            FFlagLargeReplicatorRead2                          = "True",
+            FFlagPreComputeAcceleratorArrayForSharingTimeCurve = "True",
+            FFlagUserBetterInertialScrolling                   = "True",
+            FFlagUISUseLastFrameTimeInUpdateInputSignal        = "True",
+            DFFlagNextGenRepRollbackOverbudgetPackets          = "True",
+            DFFlagTeleportClientAssetPreloadingDoingExperiment2 = "True",
+            DFIntMegaReplicatorNumParallelTasks                = "12",
+            DFIntNetworkClusterPacketCacheNumParallelTasks     = "12",
+            DFIntTaskSchedulerJobInitThreads                   = "12",
+            DFIntCodecMaxOutgoingFrames                        = "1000",
+            DFIntS2PhysicsSenderRate                          = "128",
+            DFIntGraphicsOptimizationModeMaxFrameTimeTargetMs  = "25",
+            DFIntGraphicsOptimizationModeMinFrameTimeTargetMs  = "16",
+            FIntActivatedCountTimerMSKeyboard                  = "0",
+        }
+        for flagName, flagValue in PerfFlags do
+            Cleostrap.ToggleFFlag(flagName, flagValue)
+        end
+    end
 })
 
 local updatedfonts: table = {}
@@ -774,31 +842,37 @@ local HitregFix: toggle = FastFlags:AddToggle({
         Cleostrap.UpdateConfig("HitregFix", callback)
         if not callback then return end
         local HitregFlags = {
-            DFIntCodecMaxIncomingPackets = "100",
-            DFIntCodecMaxOutgoingFrames = "10000",
-            DFIntLargePacketQueueSizeCutoffMB = "1000",
-            DFIntMaxProcessPacketsJobScaling = "10000",
-            DFIntMaxProcessPacketsStepsAccumulated = "0",
-            DFIntMaxProcessPacketsStepsPerCyclic = "5000",
-            DFIntMegaReplicatorNetworkQualityProcessorUnit = "10",
-            DFIntNetworkLatencyTolerance = "1",
-            DFIntNetworkPrediction = "120",
-            DFIntOptimizePingThreshold = "50",
-            DFIntPlayerNetworkUpdateQueueSize = "20",
-            DFIntPlayerNetworkUpdateRate = "60",
+            DFIntCodecMaxIncomingPackets                    = "100",
+            DFIntCodecMaxOutgoingFrames                     = "1000",
+            DFIntLargePacketQueueSizeCutoffMB               = "1000",
+            DFIntMaxProcessPacketsJobScaling                 = "10000",
+            DFIntMaxProcessPacketsStepsAccumulated           = "0",
+            DFIntMaxProcessPacketsStepsPerCyclic             = "5000",
+            DFIntMegaReplicatorNetworkQualityProcessorUnit   = "12",
+            DFIntMegaReplicatorNumParallelTasks              = "12",
+            DFIntNetworkClusterPacketCacheNumParallelTasks   = "12",
+            DFIntNetworkLatencyTolerance                     = "1",
+            DFIntNetworkPrediction                           = "120",
+            DFIntOptimizePingThreshold                       = "50",
+            DFIntPlayerNetworkUpdateQueueSize                = "20",
+            DFIntPlayerNetworkUpdateRate                     = "60",
             DFIntRaknetBandwidthInfluxHundredthsPercentageV2 = "10000",
-            DFIntRaknetBandwidthPingSendEveryXSeconds = "1",
-            DFIntRakNetLoopMs = "1",
-            DFIntRakNetResendRttMultiple = "1",
-            DFIntServerPhysicsUpdateRate = "60",
-            DFIntServerTickRate = "60",
-            DFIntWaitOnRecvFromLoopEndedMS = "100",
-            DFIntWaitOnUpdateNetworkLoopEndedMS = "100",
-            FFlagOptimizeNetwork = "true",
-            FFlagOptimizeNetworkRouting = "true",
-            FFlagOptimizeNetworkTransport = "true",
-            FFlagOptimizeServerTickRate = "true",
-            FIntRakNetResendBufferArrayLength = "128",
+            DFIntRaknetBandwidthPingSendEveryXSeconds        = "1",
+            DFIntRakNetLoopMs                                = "1",
+            DFIntRakNetResendRttMultiple                     = "1",
+            DFIntS2PhysicsSenderRate                         = "128",
+            DFIntServerPhysicsUpdateRate                     = "60",
+            DFIntServerTickRate                              = "60",
+            DFIntWaitOnRecvFromLoopEndedMS                   = "100",
+            DFIntWaitOnUpdateNetworkLoopEndedMS              = "100",
+            DFFlagNextGenRepRollbackOverbudgetPackets        = "True",
+            DFFlagReplicatorSeparateVarThresholds            = "True",
+            FFlagLargeReplicatorRead2                        = "True",
+            FFlagOptimizeNetwork                             = "true",
+            FFlagOptimizeNetworkRouting                      = "true",
+            FFlagOptimizeNetworkTransport                    = "true",
+            FFlagOptimizeServerTickRate                      = "true",
+            FIntRakNetResendBufferArrayLength                = "128",
         }
         for flagName, flagValue in HitregFlags do
             Cleostrap.ToggleFFlag(flagName, flagValue)
@@ -1008,9 +1082,85 @@ local TextureQuality: dropdown = EngineSettings:AddDropdown({
     Description = "",
     Options = {"Automatic", "Lowest (Requires rejoin)", "Low", "Medium", "High", "Highest"},
     Default = Cleostrap.Config.TextureQuality,
-    Callback = function(level: string)
+    Callback = function(level)
         Cleostrap.UpdateConfig("TextureQuality", level)
         pcall(changeTextureQuality, level)
+    end
+})
+
+EngineSettings:AddSection({"Extras", "sparkles"})
+
+local DisableWind: toggle = EngineSettings:AddToggle({
+    Name = "Disable wind",
+    Description = "Removes global wind rendering and simulation.",
+    Default = Cleostrap.Config.DisableWind,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableWind", callback)
+        Cleostrap.ToggleFFlag("FFlagGlobalWindRendering", not callback)
+        Cleostrap.ToggleFFlag("FFlagGlobalWindActivated", not callback)
+    end
+})
+
+local RemoveGrass: toggle = EngineSettings:AddToggle({
+    Name = "Remove grass",
+    Description = "Eliminates terrain grass for cleaner visuals and a small performance gain.",
+    Default = Cleostrap.Config.RemoveGrass,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("RemoveGrass", callback)
+        Cleostrap.ToggleFFlag("FIntFRMMinGrassDistance",     callback and 0 or 125)
+        Cleostrap.ToggleFFlag("FIntFRMMaxGrassDistance",     callback and 0 or 2000)
+        Cleostrap.ToggleFFlag("FIntRenderGrassDetailStrands", callback and 0 or 32)
+        Cleostrap.ToggleFFlag("FIntRenderGrassHeightScaler", callback and 0 or 1)
+    end
+})
+
+local InfiniteZoom: toggle = EngineSettings:AddToggle({
+    Name = "Infinite zoom",
+    Description = "Removes the camera max zoom limit.",
+    Default = Cleostrap.Config.InfiniteZoom,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("InfiniteZoom", callback)
+        Cleostrap.ToggleFFlag("FIntCameraMaxZoomDistance", callback and 9999 or 400)
+    end
+})
+
+local DisableDynamicHeads: toggle = EngineSettings:AddToggle({
+    Name = "Disable dynamic heads",
+    Description = "Disables animated facial expressions on avatars.",
+    Default = Cleostrap.Config.DisableDynamicHeads,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableDynamicHeads", callback)
+        Cleostrap.ToggleFFlag("DFFlagEnableDynamicHeadByDefault", not callback)
+    end
+})
+
+local DisableBlur: toggle = EngineSettings:AddToggle({
+    Name = "Remove disconnect blur",
+    Description = "Removes the blur overlay on the disconnect and loading screens.",
+    Default = Cleostrap.Config.DisableBlur,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableBlur", callback)
+        Cleostrap.ToggleFFlag("FIntRobloxGuiBlurIntensity", callback and 0 or 24)
+    end
+})
+
+local DisableBubbleChat: toggle = EngineSettings:AddToggle({
+    Name = "Disable bubble chat",
+    Description = "Hides chat bubbles above player heads.",
+    Default = Cleostrap.Config.DisableBubbleChat,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("DisableBubbleChat", callback)
+        Cleostrap.ToggleFFlag("FFlagEnableBubbleChatFromChatService", not callback)
+    end
+})
+
+local NoInternetDisconnect: toggle = EngineSettings:AddToggle({
+    Name = "No internet disconnect",
+    Description = "Hides the disconnection message when internet drops. You will still be kicked.",
+    Default = Cleostrap.Config.NoInternetDisconnect,
+    Callback = function(callback)
+        Cleostrap.UpdateConfig("NoInternetDisconnect", callback)
+        Cleostrap.ToggleFFlag("DFFlagDebugDisableTimeoutDisconnect", callback)
     end
 })
 
