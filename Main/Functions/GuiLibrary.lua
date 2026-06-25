@@ -129,6 +129,18 @@ local cleolib = {
 			["Color Text"] = Color3.fromRGB(255, 240, 225),
 			["Color Dark Text"] = Color3.fromRGB(210, 175, 145)
 		},
+		Cleostrap = {
+			["Color Hub 1"] = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(16, 12, 24)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(22, 16, 32)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(16, 12, 24))
+			}),
+			["Color Hub 2"] = Color3.fromRGB(20, 14, 30),
+			["Color Stroke"] = Color3.fromRGB(90, 45, 110),
+			["Color Theme"] = Color3.fromRGB(219, 89, 171),
+			["Color Text"] = Color3.fromRGB(255, 245, 255),
+			["Color Dark Text"] = Color3.fromRGB(195, 160, 215)
+		},
 	},
 	Info = {
 		Version = "1.1.0"
@@ -136,7 +148,7 @@ local cleolib = {
 	Save = {
 		UISize = {550, 380},
 		TabSize = 160,
-		Theme = "Darker"
+		Theme = "Cleostrap"
 	},
 	Settings = {},
 	Connection = {},
@@ -689,6 +701,9 @@ function cleolib:MakeWindow(Configs)
 		Size = UDim2.fromOffset(UISizeX, UISizeY),
 		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
 		BackgroundTransparency = 0.03,
+		Image = "rbxassetid://125683901243942",
+		ImageTransparency = 0.62,
+		ScaleType = Enum.ScaleType.Crop,
 		Name = "Hub"
 	}), "Main")
 	Make("Gradient", MainFrame, {
@@ -720,6 +735,7 @@ function cleolib:MakeWindow(Configs)
 		TextSize = 12,
 		TextColor3 = Theme["Color Text"],
 		BackgroundTransparency = 1,
+		TextTransparency = 1,
 		Font = Enum.Font.GothamMedium,
 		Name = "Title"
 	}, {
@@ -731,6 +747,7 @@ function cleolib:MakeWindow(Configs)
 			Text = WMiniText,
 			TextColor3 = Theme["Color Dark Text"],
 			BackgroundTransparency = 1,
+			TextTransparency = 1,
 			TextXAlignment = "Left",
 			TextYAlignment = "Bottom",
 			TextSize = 8,
@@ -738,6 +755,16 @@ function cleolib:MakeWindow(Configs)
 			Name = "SubTitle"
 		}), "DarkText")
 	}), "Text")
+
+	Create("ImageLabel", TopBar, {
+		Position = UDim2.new(0, 10, 0.5),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Size = UDim2.new(0, 108, 0, 22),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://93563907438415",
+		ScaleType = Enum.ScaleType.Fit,
+		Name = "TitleLogo"
+	})
 	
 	local MainScroll = InsertTheme(Create("ScrollingFrame", Components, {
 		Size = UDim2.new(0, cleolib.Save.TabSize, 1, -TopBar.Size.Y.Offset),
