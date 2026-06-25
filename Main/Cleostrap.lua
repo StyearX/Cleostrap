@@ -37,6 +37,8 @@ Cleostrap.Config = setmetatable({
 	DisableAds = false,
 	DisableTelemetry = false,
 	RenderingApi = "Default",
+	RenderDistance = "Default",
+	GraphicsQuality = "Default",
 	BypassFpsCap = false,
 	NoTextures = false,
 	SmootherTerrain = false,
@@ -63,6 +65,7 @@ Cleostrap.canUpdate = false
 Cleostrap.UpdateConfig = function(obj: string, val: any)
 	if not Cleostrap.canUpdate then Cleostrap.Config = conf return end
 	Cleostrap.Config[obj] = val
+	pcall(Cleostrap.SaveConfig)
 end
 Cleostrap.SaveConfig = function()
 	return writefile("Cleostrap/Main/Configs/Default.json", HttpService:JSONEncode(Cleostrap.Config))
@@ -445,11 +448,12 @@ end)
 
 local fakeRobloxImage = fakerobloxbutton and fakerobloxbutton:FindFirstChildOfClass("ImageLabel")
 
+local CleostrapTopbarIcon = nil
+local SavedScalingIcon = nil
 local customtopbar
-local topbarChatConnection
 customtopbar = Appearance:AddToggle({
 	Name = 'Cleostrap Topbars',
-	Description = 'Gives you a cool unique topbar.',
+	Description = 'Replaces the Roblox logo in the topbar with the Cleostrap icon. The native Roblox menu button stays fully functional.',
 	Default = Cleostrap.Config.customtopbar,
 	Callback = function(call)
 		Cleostrap.UpdateConfig('customtopbar', call)
@@ -461,72 +465,34 @@ customtopbar = Appearance:AddToggle({
 			local background = triggerPoint and triggerPoint:FindFirstChild("Background")
 			local scalingIcon = background and background:FindFirstChild("ScalingIcon")
 
-			local chat, chatSub = FindChatMenuFrame(bar)
-			local nineDot = FindNineDotMenuFrame(bar)
-
-			local topbarinstances = {}
-			if chat then
-				local integrationIconFrame = chat:FindFirstChild("IntegrationIconFrame")
-				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
-				if integrationIcon then table.insert(topbarinstances, integrationIcon) end
-			end
-			if nineDot then
-				local integrationIconFrame = nineDot:FindFirstChild("IntegrationIconFrame")
-				local integrationIcon = integrationIconFrame and integrationIconFrame:FindFirstChild("IntegrationIcon")
-				if integrationIcon then
-					local overflow = integrationIcon:FindFirstChild("Overflow")
-					local close = integrationIcon:FindFirstChild("Close")
-					if overflow then table.insert(topbarinstances, overflow) end
-					if close then table.insert(topbarinstances, close) end
-				end
-			end
-			if scalingIcon then table.insert(topbarinstances, scalingIcon) end
-
 			if call then
-				if chat then
-					topbarChatConnection = chat.ChildAdded:Connect(function(v)
-						local grad = Instance.new('UIGradient', v)
-						grad.Rotation = -60
-						grad.Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-						})
-						if v:FindFirstChild("Text") then
-							v.Text.TextColor3 = Color3.new()
-							v.Text.TextTruncate = 'None'
-						end
-						table.insert(gradients, grad)
-					end)
+				SavedScalingIcon = scalingIcon
+				if scalingIcon then
+					scalingIcon.ImageTransparency = 1
 				end
-				if chatSub then
-					local badge = chatSub:FindFirstChild('Badge')
-					if badge then
-						local grad = Instance.new('UIGradient', badge)
-						if badge:FindFirstChild("Text") then
-							badge.Text.TextTruncate = 'None'
-							badge.Text.TextColor3 = Color3.new()
-						end
-						grad.Rotation = -60
-						grad.Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-							ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-						})
-						table.insert(gradients, grad)
-					end
-				end
-				for _, v in topbarinstances do
-					local grad = Instance.new('UIGradient', v)
-					grad.Rotation = 60
-					grad.Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(219, 89, 171)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(61, 56, 192))
-					})
-					table.insert(gradients, grad)
+				if background then
+					local existing = background:FindFirstChild("CleostrapTopIcon")
+					if existing then existing:Destroy() end
+					CleostrapTopbarIcon = Instance.new("ImageLabel")
+					CleostrapTopbarIcon.Name = "CleostrapTopIcon"
+					CleostrapTopbarIcon.Size = UDim2.new(0, 28, 0, 28)
+					CleostrapTopbarIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+					CleostrapTopbarIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+					CleostrapTopbarIcon.BackgroundTransparency = 1
+					CleostrapTopbarIcon.Image = "rbxassetid://93563907438415"
+					CleostrapTopbarIcon.ScaleType = Enum.ScaleType.Fit
+					CleostrapTopbarIcon.ZIndex = math.max(1, (scalingIcon and scalingIcon.ZIndex or 1) - 1)
+					CleostrapTopbarIcon.Parent = background
 				end
 			else
-				pcall(function() topbarChatConnection:Disconnect() end)
-				for _, v in gradients do pcall(function() v:Destroy() end) end
-				table.clear(gradients)
+				if SavedScalingIcon then
+					pcall(function() SavedScalingIcon.ImageTransparency = 0 end)
+					SavedScalingIcon = nil
+				end
+				if CleostrapTopbarIcon then
+					pcall(function() CleostrapTopbarIcon:Destroy() end)
+					CleostrapTopbarIcon = nil
+				end
 			end
 		end)
 
@@ -1237,22 +1203,24 @@ local DisableTerrainTextures: toggle = EngineSettings:AddToggle({
 local origValue = tonumber(Cleostrap.GetFFlag("DFIntTaskSchedulerTargetFps")) or 60
 local FramerateLimit: textbox = EngineSettings:AddTextBox({
     Name = "Framerate limit",
-    Description = "Set to 0 if you want to use Roblox's native framerate unlocker.",
-    Default = Cleostrap.Config.FPS,
+    Description = "Set your FPS cap. Enter 0 to bypass the cap entirely (unlimited). Enter 9999 to force max scheduler rate.",
+    Default = (Cleostrap.Config.BypassFpsCap and 0) or Cleostrap.Config.FPS or 120,
     Callback = function(fps)
         if type(fps) == "string" then fps = tonumber(fps) end
         if type(fps) ~= "number" then return end
         Cleostrap.UpdateConfig("FPS", fps)
-        Cleostrap.ToggleFFlag("FFlagTaskSchedulerLimitTargetFpsTo2402", fps >= 70)
-        if fps > 0 then
-            pcall(setfpscap, fps)
-            Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", fps)
-        else
+        Cleostrap.UpdateConfig("BypassFpsCap", fps == 0)
+        if fps == 0 then
             pcall(setfpscap, 9e9)
-            Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", origValue)
+            Cleostrap.ToggleFFlag("FFlagTaskSchedulerLimitTargetFpsTo2402", false)
+            Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", 9999)
+        else
+            pcall(setfpscap, fps)
+            Cleostrap.ToggleFFlag("FFlagTaskSchedulerLimitTargetFpsTo2402", fps >= 70)
+            Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", fps)
         end
-    end;
-});
+    end
+})
 EngineSettings:AddToggle({
     Name = 'Display FPS',
     Default = Cleostrap.Config.DisplayFPS,
@@ -1376,17 +1344,49 @@ local RenderingApi: dropdown = EngineSettings:AddDropdown({
     end
 })
 
-EngineSettings:AddSection({"Graphics", "image"})
-
-local BypassFpsCap: toggle = EngineSettings:AddToggle({
-    Name = "Bypass FPS cap",
-    Description = "Sets the scheduler target to 9999 to remove the FPS ceiling.",
-    Default = Cleostrap.Config.BypassFpsCap,
-    Callback = function(callback)
-        Cleostrap.UpdateConfig("BypassFpsCap", callback)
-        Cleostrap.ToggleFFlag("DFIntTaskSchedulerTargetFps", callback and 9999 or origValue)
+local RenderDistanceValues = {
+    Lowest = 1,
+    Low    = 256,
+    Medium = 512,
+    High   = 1024,
+    Extreme = 0,
+}
+EngineSettings:AddDropdown({
+    Name = "Render distance",
+    Description = "Controls the GC (garbage collection) render culling distance. Extreme removes the limit entirely.",
+    Options = {"Default", "Lowest", "Low", "Medium", "High", "Extreme"},
+    Default = Cleostrap.Config.RenderDistance or "Default",
+    Callback = function(option)
+        Cleostrap.UpdateConfig("RenderDistance", option)
+        if option == "Default" then
+            Cleostrap.ToggleFFlag("DFIntDebugRestrictGCDistance", 0)
+        else
+            Cleostrap.ToggleFFlag("DFIntDebugRestrictGCDistance", RenderDistanceValues[option])
+        end
     end
 })
+
+local GraphicQualityOptions = {}
+for i = 1, 21 do
+    table.insert(GraphicQualityOptions, tostring(i))
+end
+table.insert(GraphicQualityOptions, 1, "Default")
+EngineSettings:AddDropdown({
+    Name = "Graphics quality",
+    Description = "Forces the FRM quality level override from 1 (lowest) to 21 (maximum). Default lets Roblox decide.",
+    Options = GraphicQualityOptions,
+    Default = Cleostrap.Config.GraphicsQuality or "Default",
+    Callback = function(option)
+        Cleostrap.UpdateConfig("GraphicsQuality", option)
+        if option == "Default" then
+            Cleostrap.ToggleFFlag("DFIntDebugFRMQualityLevelOverride", 0)
+        else
+            Cleostrap.ToggleFFlag("DFIntDebugFRMQualityLevelOverride", tonumber(option))
+        end
+    end
+})
+
+EngineSettings:AddSection({"Graphics", "image"})
 
 local NoTextures: toggle = EngineSettings:AddToggle({
     Name = "No textures",
