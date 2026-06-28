@@ -702,7 +702,7 @@ function cleolib:MakeWindow(Configs)
 		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
 		BackgroundTransparency = 0.7,
 		Image = "rbxassetid://125683901243942",
-		ImageTransparency = 0.8,
+		ImageTransparency = 0,
 		ScaleType = Enum.ScaleType.Crop,
 		Name = "Hub"
 	}), "Main")
