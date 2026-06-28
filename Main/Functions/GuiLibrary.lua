@@ -8,9 +8,6 @@ local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerMouse = Player:GetMouse()
 
--- Icon pack (StyearX/Icons). Icons are pre-loaded into getgenv().CleostrapIcons
--- by Cleostrap.start before GuiLibrary is initialized, so all MakeTab/AddSection
--- calls resolve icons immediately without any network blocking.
 local IconsModule
 local function GetIconsModule()
 	if IconsModule then return IconsModule end
@@ -608,7 +605,6 @@ function cleolib:GetIcon(index)
 	return ""
 end
 
--- Returns: assetId (string), rectData (table|nil)
 function cleolib:GetIconFull(index)
 	if type(index) ~= "string" or index:gsub(" ", ""):len() == 0 then
 		return "", nil
@@ -617,13 +613,11 @@ function cleolib:GetIconFull(index)
 	local Icons = GetIconsModule()
 	if not Icons or not Icons.Loaded then return "", nil end
 
-	-- Try GetIcon first (returns plain rbxassetid:// for flat packs like lucide)
 	local ok, result = pcall(function() return Icons.GetIcon(index) end)
 	if ok and type(result) == "string" and result:find("rbxassetid://") then
 		return result, nil
 	end
 
-	-- Try Icon() which returns {sheet_id, rectData} for spritesheet packs
 	local ok2, result2 = pcall(function() return Icons.Icon(index) end)
 	if ok2 and type(result2) == "table" and type(result2[1]) == "string" then
 		return result2[1], result2[2]
@@ -642,12 +636,17 @@ function cleolib:SetTheme(NewTheme)
 	Connection:FireConnection("ThemeChanged", NewTheme)
 
 	for _, Val in pairs(cleolib.Instances) do
-		-- Skip instances that have been destroyed
 		if not Val.Instance or not Val.Instance.Parent then continue end
 
 		local ok, err = pcall(function()
 			if Val.Type == "Gradient" then
 				Val.Instance.Color = Theme["Color Hub 1"]
+			elseif Val.Type == "Main" then
+				local overlay = Val.Instance:FindFirstChild("GradientOverlay")
+				if overlay then
+					local grad = overlay:FindFirstChildOfClass("UIGradient")
+					if grad then grad.Color = Theme["Color Hub 1"] end
+				end
 			elseif Val.Type == "Frame" then
 				Val.Instance.BackgroundColor3 = Theme["Color Hub 2"]
 			elseif Val.Type == "Stroke" then
@@ -700,15 +699,28 @@ function cleolib:MakeWindow(Configs)
 	local MainFrame = InsertTheme(Create("ImageButton", ScreenGui, {
 		Size = UDim2.fromOffset(UISizeX, UISizeY),
 		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
-		BackgroundTransparency = 0.7,
+		BackgroundTransparency = 1,
 		Image = "rbxassetid://125683901243942",
 		ImageTransparency = 0,
 		ScaleType = Enum.ScaleType.Crop,
 		Name = "Hub"
 	}), "Main")
-	Make("Gradient", MainFrame, {
+	local GradientOverlay = Create("Frame", MainFrame, {
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.3,
+		BorderSizePixel = 0,
+		Name = "GradientOverlay",
+		ZIndex = 0
+	})
+	Make("Gradient", GradientOverlay, {
 		Rotation = 45
-	})MakeDrag(MainFrame)
+	})
+	Create("UICorner", GradientOverlay, {
+		CornerRadius = UDim.new(0, 6)
+	})
+	MakeDrag(MainFrame)
 	
 	local MainCorner = Make("Corner", MainFrame)
 	
