@@ -87,10 +87,6 @@ Cleostrap.error = notif
 Cleostrap.success = notif
 Cleostrap.info = notif
 
--- TopBar resolution: Roblox's internal TopBarApp structure is undocumented
--- and changes between client versions (confirmed nested as TopBarApp.TopBarApp.*).
--- These helpers resolve it safely with a timeout instead of hard-indexing,
--- so a missing/renamed instance degrades gracefully instead of erroring.
 local function GetTopBar(timeoutSeconds: number?)
 	local CoreGui = cloneref(game:GetService("CoreGui"))
 	local ok, outer = pcall(function()
@@ -104,15 +100,9 @@ local function GetTopBar(timeoutSeconds: number?)
 	if ok2 and inner then
 		return inner
 	end
-	-- some client versions are not double-nested; fall back to the outer instance
 	return outer
 end
 
--- Finds the chat menu frame inside UnibarMenu without relying on brittle
--- numeric index names (e.g. ["2"]["3"]) which Roblox can reassign at any time.
--- Walks descendants looking for a child literally named "chat", then the
--- numeric "5" subframe is resolved by scanning that child's children instead
--- of indexing it directly.
 local function FindChatMenuFrame(topBar: Instance?)
 	if not topBar then return nil end
 	local ok, unibarMenu = pcall(function()
@@ -130,8 +120,6 @@ local function FindChatMenuFrame(topBar: Instance?)
 	end
 	if not chat then return nil end
 
-	-- the "5" subframe historically holds the badge/label; find it by scanning
-	-- chat's children for the first Frame-like child instead of hardcoding "5"
 	local sub = chat:FindFirstChild("5")
 	if not sub then
 		for _, child in chat:GetChildren() do
@@ -173,9 +161,6 @@ Cleostrap.start = function(vis: boolean?)
 	if not isfolder("Cleostrap/Logs") then makefolder("Cleostrap/Logs") end
 	getgenv().errorlog = getgenv().errorlog or "Cleostrap/Logs/crashlog"..HttpService:GenerateGUID(false)..".txt"
 
-	-- Pre-load the icon module synchronously before building the GUI.
-	-- GuiLibrary.lua reads getgenv().CleostrapIcons so every MakeTab/AddSection
-	-- call can resolve icons without triggering a network fetch mid-render.
 	if not getgenv().CleostrapIcons then
 		local ok, Icons = pcall(function()
 			return loadfile("Cleostrap/Main/Functions/Icons.lua")()()
@@ -833,7 +818,13 @@ local FFETextbox: textbox = FastFlags:AddTextBox({
     Default = readfile('Cleostrap/FFlags.json'),
     Callback = function(call: string)
         writefile("Cleostrap/FFlags.json", call)
-        local fflags = HttpService:JSONDecode(call:gsub('"True"', "true"):gsub('"False"', "false"))
+        local ok, fflags = pcall(function()
+            return HttpService:JSONDecode(call:gsub('"True"', "true"):gsub('"False"', "false"))
+        end)
+        if not ok or type(fflags) ~= "table" then
+            Cleostrap.error("Invalid JSON. Check your FFlags format.")
+            return
+        end
         for i,v in fflags do
             Cleostrap.ToggleFFlag(i,v)
         end
@@ -924,10 +915,6 @@ local currentcustomfont = nil
 local funnycon84
 local usecustomfont: toggle
 
--- Applies the chosen font to an instance while guarding against the
--- PropertyChangedSignal("Font") connection re-firing itself: setting
--- .FontFace also updates the legacy .Font property internally, which would
--- otherwise retrigger this same connection and spam warnings/errors forever.
 local applyingFont = {}
 local function ApplyFont(inst: Instance, currfont: string)
     if applyingFont[inst] then return end
@@ -1137,8 +1124,10 @@ local olddeathsound: toggle = EngineSettings:AddToggle({
             addcon()
             lplr.CharacterAdded:Connect(addcon)
         else
-            deathsoundConnection:Disconnect()
-            deathsoundConnection = nil
+            if deathsoundConnection then
+                deathsoundConnection:Disconnect()
+                deathsoundConnection = nil
+            end
         end
     end
 })
@@ -1499,19 +1488,14 @@ do
 		end)
 	end
 
-	-- Check if game uses TopbarPlus (PlayerGui.TopbarStandard exists)
 	local hasTopbarPlus = localPlayer:WaitForChild("PlayerGui", 5) and
 		localPlayer.PlayerGui:FindFirstChild("TopbarStandard") ~= nil
 
 	local ok = pcall(function()
 		if hasTopbarPlus then
-			-- TopbarPlus detected: inject into its Left holder so we sit
-			-- alongside existing TopbarPlus icons without overlapping.
 			local holder = localPlayer.PlayerGui.TopbarStandard.Holders.Left
 			makeButtonInFrame(holder)
 		else
-			-- No TopbarPlus: build our own minimal topbar container
-			-- inside CoreGui.TopBarApp.TopBarApp (double-nested, confirmed structure).
 			local topBarApp = GetTopBar()
 			if not topBarApp then error("TopBarApp not found") end
 
