@@ -700,7 +700,7 @@ function cleolib:MakeWindow(Configs)
 	local MainFrame = InsertTheme(Create("ImageButton", ScreenGui, {
 		Size = UDim2.fromOffset(UISizeX, UISizeY),
 		Position = UDim2.new(0.5, -UISizeX/2, 0.5, -UISizeY/2),
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 0.7,
 		Image = "rbxassetid://125683901243942",
 		ImageTransparency = 0.8,
 		ScaleType = Enum.ScaleType.Crop,
